@@ -326,11 +326,54 @@ CryptoEngine::CiphertextCKKS GeometryEngine::onSegmentOptimized(
     return onSeg;
 }
 
+
+// Version 3D
+CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3D(
+    const Segment& seg1, const Segment& seg2) {
+
+    const double threshold = 2.0;
+    const double threshold2 = threshold * threshold;
+    // Comparaison des Z (constants pour un segment)
+    const auto& p1 = seg1.first;
+    const auto& q1 = seg2.first;
+
+    auto p1_z = engine->encryptValue((double) p1.z);
+    auto q1_z = engine->encryptValue((double) q1.z);
+
+    auto dist = engine->sub(p1_z, q1_z);
+    auto dist2 = engine->mult(dist, dist);
+
+    auto ct_threshold2 = engine->constLike(p1_z, threshold2);
+
+    // (p.z - q.z)² < seuil² ?
+    auto isNearZ = engine->compareGT(ct_threshold2, dist2);
+    if(engine->decryptValue(isNearZ) < 0.5){
+        return isNearZ; 
+    }
+    intersectionTests++;
+
+
+    // On vérifie si les segments se croisent en 2 dimensions
+    auto val2D = checkSegmentIntersection(seg1, seg2);
+    if(engine->decryptValue(val2D) < 0.5){
+        return val2D; 
+    }
+
+    return engine->eAnd(val2D, isNearZ);
+    }
+
+
 // Point d'entrée principal
 CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection(
     const Segment& seg1, const Segment& seg2) {
     return checkSegmentIntersectionBasic(seg1, seg2);
 }
+
+CryptoEngine::CiphertextCKKS GeometryEngine::checkCollision3D(
+    const Segment& seg1, const Segment& seg2) {
+    return checkSegmentIntersection3D(seg1, seg2);
+}
+
 
 void GeometryEngine::printStats() const {
     std::cout << "\n=== Geometry Engine Statistics ===" << std::endl;
