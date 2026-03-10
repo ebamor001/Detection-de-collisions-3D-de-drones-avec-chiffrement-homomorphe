@@ -57,4 +57,23 @@ namespace DroneConstants {
     constexpr size_t DEFAULT_BATCH_SIZE = 8;  // Pour vectorisation CKKS
 }
 
+// Structure représentant un drone
+struct Drone{
+    int id;
+    std::vector<Segment> segments = {};
+    std::vector<int> id_alice = {};
+    std::vector<int> id_bob = {};
+
+    Drone() : id(0) {}
+    Drone(int id_) : id(id_) {}
+
+    // Affichage
+    friend std::ostream& operator<<(std::ostream& os, Drone& drone){
+        os << "id : " << drone.id ;
+        return os;
+    }
+
+
+};
+
 #endif // TYPES_HPP
