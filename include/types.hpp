@@ -6,17 +6,19 @@
 #include <string>
 #include <iostream>
 
+#define BATCH_SIZE 16
+
 /**
  * Structure représentant un point avec coordonnées entières
  * Bornes: -99 <= x,y <= 99 (comme dans le papier original)
  */
 struct IntPoint {
-    long x;
-    long y;
-    long z;
+    double x;
+    double y;
+    double z;
     
     IntPoint() : x(0), y(0) , z(0) {}
-    IntPoint(long x_, long y_, long z_) : x(x_), y(y_), z(z_) {}
+    IntPoint(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
     
     // Opérateurs utiles
     bool operator==(const IntPoint& other) const {

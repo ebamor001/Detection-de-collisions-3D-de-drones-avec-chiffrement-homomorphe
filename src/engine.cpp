@@ -17,7 +17,7 @@ void CryptoEngine::initialize(const Config& cfg) {
     params.SetScalingTechnique(FLEXIBLEAUTO);
     params.SetSecurityLevel(HEStd_NotSet);   // sécurité gérée par ringDim fixé
     params.SetRingDim(8192);
-    params.SetBatchSize(1);                  // *** pas de batching ***
+    params.SetBatchSize(BATCH_SIZE);                  // *** pas de batching ***
     params.SetSecretKeyDist(UNIFORM_TERNARY);
     params.SetKeySwitchTechnique(HYBRID);
     params.SetNumLargeDigits(3);
@@ -242,10 +242,10 @@ CryptoEngine::CiphertextCKKS CryptoEngine::encryptValue(double value) {
 
 CryptoEngine::CiphertextCKKS CryptoEngine::encryptVector(const std::vector<double>& v) {
     checkInitialized();
-    std::vector<double> buf(1, v.empty() ? 0.0 : v[0]);
-    auto pt = cc->MakeCKKSPackedPlaintext(buf);
+    auto pt = cc->MakeCKKSPackedPlaintext(v);
     return cc->Encrypt(keys.publicKey, pt);
 }
+
 
 double CryptoEngine::decryptValue(const CiphertextCKKS& ct) {
     checkInitialized();
@@ -256,7 +256,11 @@ double CryptoEngine::decryptValue(const CiphertextCKKS& ct) {
 }
 
 std::vector<double> CryptoEngine::decryptVector(const CiphertextCKKS& ct) {
-    return {decryptValue(ct)};
+    checkInitialized();
+    Plaintext pt;
+    cc->Decrypt(keys.secretKey, ct, &pt);
+    std::vector<double> cv = pt->GetRealPackedValue();
+    return cv;
 }
 
 // Arithmetic Operations

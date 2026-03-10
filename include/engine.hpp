@@ -34,7 +34,7 @@ public:
         Config()
             : multDepth(18),
               scaleModSize(50),
-              batchSize(1),
+              batchSize(BATCH_SIZE),
               secLevel(HEStd_NotSet),
               ringDim(8192),
               slBin(TOY),
