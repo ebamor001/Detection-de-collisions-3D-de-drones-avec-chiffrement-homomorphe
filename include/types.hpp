@@ -5,8 +5,9 @@
 #include <utility>
 #include <string>
 #include <iostream>
+#include <random>
 
-#define BATCH_SIZE 16
+#define BATCH_SIZE 32
 
 /**
  * Structure représentant un point avec coordonnées entières
@@ -20,6 +21,11 @@ struct IntPoint {
     IntPoint() : x(0), y(0) , z(0) {}
     IntPoint(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
     
+    // Méthodes
+    std::vector<double> PointToVector(){
+        return {x,y,z};
+    }
+
     // Opérateurs utiles
     bool operator==(const IntPoint& other) const {
         return x == other.x && y == other.y && z == other.z;
@@ -62,12 +68,39 @@ namespace DroneConstants {
 // Structure représentant un drone
 struct Drone{
     int id;
+
     std::vector<Segment> segments = {};
+    std::vector<double> points = {};
+    double z; // altitude
+
+    // autres drones avec une relation Alice/Bob
     std::vector<int> id_alice = {};
     std::vector<int> id_bob = {};
 
-    Drone() : id(0) {}
-    Drone(int id_) : id(id_) {}
+    // Constructeurs
+    Drone() : id(0), z(0) {}
+    Drone(int id_, double z_, std::vector<double>points_) : id(id_), z(z_), points(points_) {}
+    Drone(int id_, double z_, int nb_segments) : id(id_), z(z_){
+        int max_points = nb_segments * 3; 
+        GeneratePoints(max_points);
+        //GenerateSegments(&segments);
+    }
+
+    // Génération de points aléatoires
+    void GeneratePoints(int max){
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_real_distribution<> dis(-99.0, 100.0);
+        
+        for(int i=1; i<max+1; i++){
+            if(i % 3 == 0){
+                points.push_back(z);
+                continue;
+            }
+            points.push_back(dis(gen));
+        }
+        
+    }
 
     // Affichage
     friend std::ostream& operator<<(std::ostream& os, Drone& drone){
