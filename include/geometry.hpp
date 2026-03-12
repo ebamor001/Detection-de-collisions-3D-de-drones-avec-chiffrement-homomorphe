@@ -5,6 +5,7 @@
 #include "types.hpp"
 #include <vector>
 #include <tuple>
+#include <utility>
 
 class GeometryEngine {
 public:
@@ -16,53 +17,36 @@ public:
         COUNTERCLOCKWISE = 2
     };
 
+    enum DropAxis { DROP_X=0, DROP_Y=1, DROP_Z=2 };
+
     explicit GeometryEngine(CryptoEngine* engine);
+
+
+    // ===== 1) Fonctions en clair =====
+    static Orientation orientationClear2D(const IntPoint& p, const IntPoint& q, const IntPoint& r, DropAxis drop);
+    static bool onSegmentClear2D(const IntPoint& p, const IntPoint& q, const IntPoint& r, DropAxis drop);
+    static bool doSegmentsIntersectClear2D(const Segment& s1, const Segment& s2, DropAxis drop);
+    static bool doSegmentsIntersectClear3D(const Segment& seg1, const Segment& seg2); // <- 3D wrapper clair (projection + coplanarité)
+
+    // ===== 2) HE primitives: orientation (chiffrés) =====
     
-    // Fonctions en clair (static)
-    static Orientation orientationClear(const IntPoint& p, const IntPoint& q, const IntPoint& r);
-    static bool onSegmentClear(const IntPoint& p, const IntPoint& q, const IntPoint& r);
-    static bool doSegmentsIntersectClear(const Segment& seg1, const Segment& seg2);
-    
-    // Fonctions chiffrées - scalaires
-    CiphertextCKKS computeOrientationValue(const IntPoint& p, const IntPoint& q, const IntPoint& r);
+    CiphertextCKKS computeOrientationValue2D(const IntPoint& p, const IntPoint& q, const IntPoint& r, DropAxis drop);
+    CiphertextCKKS computeOrientation2D(const IntPoint& p, const IntPoint& q, const IntPoint& r, DropAxis drop);    
     CiphertextCKKS extractOrientationSign(const CiphertextCKKS& orientationVal);
-    CiphertextCKKS computeOrientation(const IntPoint& p, const IntPoint& q, const IntPoint& r);
-    CiphertextCKKS onSegmentEncrypted(const IntPoint& p, const IntPoint& q, const IntPoint& r);
-    
-    // Fonctions chiffrées - packées
-    CiphertextCKKS computeOrientationValuesPacked4(const Segment& s1, const Segment& s2);
-    CiphertextCKKS checkSegmentIntersection(const Segment& seg1, const Segment& seg2);
-    CiphertextCKKS checkSegmentIntersectionFast(const Segment& seg1, const Segment& seg2);
-    
-    // Fonctions chiffrées - batched
-    CiphertextCKKS computeOrientationsBatched(
-        const std::vector<std::tuple<IntPoint, IntPoint, IntPoint>>& triplets);
-    
-    std::vector<CiphertextCKKS> computeOrientationsBatch(
-        const std::vector<std::tuple<IntPoint, IntPoint, IntPoint>>& triplets);
-    
-    // Validation et stats
+    CiphertextCKKS onSegment2D(const IntPoint& p, const IntPoint& q, const IntPoint& r,DropAxis drop, double eps);
+    CiphertextCKKS checkSegmentIntersection2D(const Segment& seg1, const Segment& seg2, DropAxis drop);
+    CiphertextCKKS checkSegmentIntersection3D(const Segment& seg1, const Segment& seg2);
+
+
+    // ===== 3) Validation / stats =====
     bool validatePoints(const IntPoint& p, const IntPoint& q, const IntPoint& r) const;
     void printStats() const;
-    
+        
+    void resetBootstrapCount() { bootstrapCount = 0; }    
     size_t getOrientationComputations() const { return orientationComputations; }
     size_t getSignExtractions() const { return signExtractions; }
     size_t getIntersectionTests() const { return intersectionTests; }
     size_t getBootstrapCount() const { return bootstrapCount; }
-
-
-    // Test on-segment entièrement chiffré
-    CiphertextCKKS onSegmentHE(const IntPoint& p, const IntPoint& q, 
-                            const IntPoint& r, double tauBox);
-    // On-segment par projection et colinéarité
-    CiphertextCKKS onSegmentHE_full(const IntPoint& p, const IntPoint& q, 
-                                    const IntPoint& r, double tauOri, double epsProj);
-    // Dans la section public
-    void resetBootstrapCount() { bootstrapCount = 0; }
-
-    // Version optimisée
-    CiphertextCKKS checkSegmentIntersectionOptimized(const Segment& seg1, const Segment& seg2);
-    CiphertextCKKS checkSegmentIntersectionBasic(const Segment& seg1, const Segment& seg2);
 
 private:
     CryptoEngine* engine;
@@ -72,10 +56,6 @@ private:
     mutable size_t intersectionTests = 0;
     mutable size_t bootstrapCount = 0;
 
-    
-    // Helper pour on-segment optimisé
-    CiphertextCKKS onSegmentOptimized(const IntPoint& p, const IntPoint& q, 
-                                  const IntPoint& r, double eps);   
 };
 
 #endif // GEOMETRY_HPP

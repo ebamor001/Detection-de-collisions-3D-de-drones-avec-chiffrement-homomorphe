@@ -25,7 +25,7 @@ IntersectionDetector::detectIntersectionsClear(const Path& path1, const Path& pa
         for (size_t j = 0; j < path2.size() - 1; j++) {
             Segment seg2 = {path2[j], path2[j + 1]};
             
-            bool intersects = GeometryEngine::doSegmentsIntersectClear(seg1, seg2);
+            bool intersects = GeometryEngine::doSegmentsIntersectClear3D(seg1, seg2);
             
             if (intersects) {
                 results.emplace_back(i, j, true);
@@ -56,31 +56,6 @@ IntersectionDetector::testSegmentIntersectionEncrypted(
     return ct_result;
 }
 
-CryptoEngine::CiphertextCKKS 
-IntersectionDetector::combineOrientationsForIntersection(
-    const CiphertextCKKS& s1, const CiphertextCKKS& s2,
-    const CiphertextCKKS& s3, const CiphertextCKKS& s4) {
-    
-    // Logique correcte : (s1 XOR s2) AND (s3 XOR s4)
-    // XOR(a,b) = a + b - 2*a*b pour bits 0/1
-    
-    // XOR entre s1 et s2
-    auto s1_plus_s2 = engine->add(s1, s2);
-    auto s1_times_s2 = engine->mult(s1, s2);
-    auto two_s1_s2 = engine->add(s1_times_s2, s1_times_s2);
-    auto xor12 = engine->sub(s1_plus_s2, two_s1_s2);
-    
-    // XOR entre s3 et s4
-    auto s3_plus_s4 = engine->add(s3, s4);
-    auto s3_times_s4 = engine->mult(s3, s4);
-    auto two_s3_s4 = engine->add(s3_times_s4, s3_times_s4);
-    auto xor34 = engine->sub(s3_plus_s4, two_s3_s4);
-    
-    // AND des deux XOR
-    auto result = engine->mult(xor12, xor34);
-    
-    return result;
-}
 
 std::vector<CryptoEngine::CiphertextCKKS> 
 IntersectionDetector::detectIntersectionsEncrypted(

@@ -3,23 +3,23 @@
 
 #include <vector>
 #include <utility>
-#include <string>
 #include <iostream>
 
 /**
  * Structure représentant un point avec coordonnées entières
- * Bornes: -99 <= x,y <= 99 (comme dans le papier original)
+ * Bornes: -99 <= x,y,z <= 99 
  */
 struct IntPoint {
     long x;
     long y;
+    long z;
     
-    IntPoint() : x(0), y(0) {}
-    IntPoint(long x_, long y_) : x(x_), y(y_) {}
+    IntPoint() : x(0), y(0), z(0) {}
+    IntPoint(long x_, long y_, long z_) : x(x_), y(y_), z(z_) {}
     
     // Opérateurs utiles
     bool operator==(const IntPoint& other) const {
-        return x == other.x && y == other.y;
+        return x == other.x && y == other.y && z == other.z;
     }
     
     bool operator!=(const IntPoint& other) const {
@@ -28,7 +28,7 @@ struct IntPoint {
     
     // Pour debug
     friend std::ostream& operator<<(std::ostream& os, const IntPoint& p) {
-        os << "(" << p.x << "," << p.y << ")";
+        os << "(" << p.x << "," << p.y << "," << p.z << ")";
         return os;
     }
 };

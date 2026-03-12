@@ -9,7 +9,7 @@
 
 /**
  * Module de détection d'intersection pour chemins de drones
- * Implémente l'algorithme complet du papier avec les 4 orientations
+ * Version 3D : test de coplanarité puis projection 2D
  */
 class IntersectionDetector {
 public:
@@ -40,9 +40,9 @@ public:
     // ===== Détection chiffrée =====
     
     /**
-     * Teste l'intersection de deux segments (version chiffrée complète)
-     * Implémente l'algorithme avec 4 orientations
-     */
+    * Teste l'intersection de deux segments en 3D (version chiffrée)
+    * Utilise un test de coplanarité puis une projection 2D
+    */
     CiphertextCKKS testSegmentIntersectionEncrypted(
         const Segment& seg1, 
         const Segment& seg2
@@ -99,13 +99,6 @@ private:
     size_t intersectionsFound = 0;
     std::chrono::duration<double> totalTime{0};
     
-    // Helper pour combiner les orientations en logique d'intersection
-    CiphertextCKKS combineOrientationsForIntersection(
-        const CiphertextCKKS& o1,
-        const CiphertextCKKS& o2,
-        const CiphertextCKKS& o3,
-        const CiphertextCKKS& o4
-    );
 };
 
 #endif // INTERSECTION_HPP

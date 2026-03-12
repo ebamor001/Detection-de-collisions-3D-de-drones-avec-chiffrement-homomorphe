@@ -8,14 +8,14 @@
 
 /**
  * Module I/O pour lire les chemins depuis les fichiers
- * Format attendu: (x1,y1)(x2,y2)(x3,y3)...
+ * Format attendu: (x1,y1,z1)(x2,y2,z2)(x3,y3,z3)...
  * Compatible avec le format du repo Java original
  */
 class PathIO {
 public:
     /**
      * Parse une ligne de texte contenant un chemin
-     * Format: (x1,y1)(x2,y2)...
+     * Format: (x1,y1,z1)(x2,y2,z2)...
      * @param line La ligne à parser
      * @return Le chemin extrait
      */

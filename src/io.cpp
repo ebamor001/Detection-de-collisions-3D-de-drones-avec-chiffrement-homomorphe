@@ -11,7 +11,7 @@ Path PathIO::parse_line(const std::string& line) {
     
     // Regex pour extraire les paires (x,y)
     // Supporte les nombres négatifs
-    std::regex point_regex(R"(\((-?\d+),(-?\d+)\))");
+    std::regex point_regex(R"(\((-?\d+),(-?\d+),(-?\d+)\))");
     
     // Itérateur sur tous les matches
     auto points_begin = std::sregex_iterator(line.begin(), line.end(), point_regex);
@@ -21,13 +21,16 @@ Path PathIO::parse_line(const std::string& line) {
     for (std::sregex_iterator it = points_begin; it != points_end; ++it) {
         std::smatch match = *it;
         
-        // match[0] = match complet "(x,y)"
+        // match[0] = match complet "(x,y,z)"
         // match[1] = x
         // match[2] = y
+        // match[3] = z
         long x = std::stol(match[1].str());
         long y = std::stol(match[2].str());
+        long z = std::stol(match[3].str());
+
         
-        path.emplace_back(x, y);
+        path.emplace_back(x, y ,z );
     }
     
     if (path.empty()) {
@@ -93,7 +96,7 @@ void PathIO::write_path(const Path& path, const std::string& filename) {
     }
     
     for (const auto& point : path) {
-        file << "(" << point.x << "," << point.y << ")";
+        file << "(" << point.x << "," << point.y << "," << point.z << ")";
     }
     file << std::endl;
     file.close();
@@ -135,10 +138,10 @@ Path PathIO::generate_random_path(size_t num_points, unsigned seed) {
     );
     
     Path path;
-    IntPoint last_point(LONG_MAX, LONG_MAX); // Point impossible
+    IntPoint last_point(LONG_MAX, LONG_MAX, LONG_MAX); // Point impossible
     
     while (path.size() < num_points) {
-        IntPoint new_point(dist(gen), dist(gen));
+        IntPoint new_point(dist(gen), dist(gen), dist(gen));
         
         // Éviter les points consécutifs identiques
         if (new_point != last_point) {
@@ -165,5 +168,7 @@ bool PathIO::is_point_valid(const IntPoint& p) {
     return p.x >= DroneConstants::MIN_COORDINATE && 
            p.x <= DroneConstants::MAX_COORDINATE &&
            p.y >= DroneConstants::MIN_COORDINATE && 
-           p.y <= DroneConstants::MAX_COORDINATE;
+           p.y <= DroneConstants::MAX_COORDINATE &&
+           p.z >= DroneConstants::MIN_COORDINATE &&
+           p.z <= DroneConstants::MAX_COORDINATE;
 }
