@@ -329,37 +329,72 @@ CryptoEngine::CiphertextCKKS GeometryEngine::onSegmentOptimized(
 
 // Version 3D
 CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3D(
-    const Segment& seg1, const Segment& seg2) {
+    const std::vector<Segment>& seg1, const std::vector<Segment>& seg2) {
 
+    int NbSegments = seg1.size();
     const double threshold = 2.0;
     const double threshold2 = threshold * threshold;
-    // Comparaison des Z (constants pour un segment)
-    const auto& p1 = seg1.first;
-    const auto& q1 = seg2.first;
+    std::vector<double> v_threshold2(BATCH_SIZE, threshold2);
 
-    auto p1_z = engine->encryptValue((double) p1.z);
-    auto q1_z = engine->encryptValue((double) q1.z);
+    // ---- Comparaison des coordonnées Z ----- //
 
-    auto dist = engine->sub(p1_z, q1_z);
+    // Altitudes de seg1 et seg2
+    std::vector<double> allZ1 = {};
+    std::vector<double> allZ2 = {};
+
+    for (const auto& s : seg1) {
+        allZ1.push_back(s.first.z); 
+    }
+    for (const auto& s : seg2) {
+        allZ2.push_back(s.first.z); 
+    }
+    
+
+    auto p_z = engine->encryptVector(allZ1);
+    auto q_z = engine->encryptVector(allZ2);
+
+    // Distance entre les altitudes
+    auto dist = engine->sub(p_z, q_z);
     auto dist2 = engine->mult(dist, dist);
 
-    auto ct_threshold2 = engine->constLike(p1_z, threshold2);
-
     // (p.z - q.z)² < seuil² ?
-    auto isNearZ = engine->compareGT(ct_threshold2, dist2);
-    if(engine->decryptValue(isNearZ) < 0.5){
-        return isNearZ; 
+    auto isNearZ = engine->compareGT(v_threshold2, dist2);
+
+    // Application d'un masque pour ne pas prendre en compte les slots inutilisés
+    std::vector<double> mask(BATCH_SIZE, 0.0);
+    for(int i = 0; i < NbSegments; i++) {
+        mask[i] = 1.0;
     }
+    isNearZ = engine->mult(isNearZ, mask);
+
+    // Vérification des résultats
+    auto isNearZ_dec = engine->decryptVector(isNearZ);
+    bool isCollsionPossible = false;
+
+    for(int i = 0; i < BATCH_SIZE; i++){
+        if(isNearZ_dec[i] > 0.5){
+            std::cout << " collision possible : " << i << std::endl;
+            isCollsionPossible = true;
+            break;
+        }
+    }
+
     intersectionTests++;
+    if(!isCollsionPossible){
+        return isNearZ;
+    }
+    return isNearZ;
 
+    /*
 
-    // On vérifie si les segments se croisent en 2 dimensions
+    //On vérifie si les segments se croisent en 2 dimensions
     auto val2D = checkSegmentIntersection(seg1, seg2);
     if(engine->decryptValue(val2D) < 0.5){
         return val2D; 
     }
 
     return engine->eAnd(val2D, isNearZ);
+    */
     }
 
 
@@ -370,8 +405,9 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection(
 }
 
 CryptoEngine::CiphertextCKKS GeometryEngine::checkCollision3D(
-    const Segment& seg1, const Segment& seg2) {
-    return checkSegmentIntersection3D(seg1, seg2);
+    const std::vector<Segment>& seg1, const std::vector<Segment>& seg2) {
+    auto val3D = checkSegmentIntersection3D(seg1, seg2);
+    return val3D;
 }
 
 

@@ -65,8 +65,8 @@ public:
     CiphertextCKKS checkSegmentIntersectionBasic(const Segment& seg1, const Segment& seg2);
 
     // Version 3D
-    CiphertextCKKS checkSegmentIntersection3D(const Segment& seg1, const Segment& seg2);
-    CiphertextCKKS checkCollision3D(const Segment& seg1, const Segment& seg2);
+    CiphertextCKKS checkSegmentIntersection3D(const std::vector<Segment>& seg1, const std::vector<Segment>& seg2);
+    CiphertextCKKS checkCollision3D(const std::vector<Segment>& seg1, const std::vector<Segment>& seg2);
 
 private:
     CryptoEngine* engine;

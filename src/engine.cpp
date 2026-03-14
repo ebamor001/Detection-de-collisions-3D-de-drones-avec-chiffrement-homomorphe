@@ -25,7 +25,7 @@ void CryptoEngine::initialize(const Config& cfg) {
     // Override config values with fixed ones
     config.multDepth = 17;
     config.scaleModSize = 50;
-    config.batchSize = 1;
+    config.batchSize = BATCH_SIZE;
     config.ringDim = 8192;
 
     cc = GenCryptoContext(params);
@@ -62,8 +62,8 @@ void CryptoEngine::setupSchemeSwitching() {
         swp.SetCtxtModSizeFHEWLargePrec(config.logQ_ccLWE);
 
         // *** scalaire ***
-        swp.SetNumSlotsCKKS(1);
-        swp.SetNumValues(1);
+        swp.SetNumSlotsCKKS(BATCH_SIZE);
+        swp.SetNumValues(BATCH_SIZE);
 
         lweSK = cc->EvalSchemeSwitchingSetup(swp);
         cc->EvalSchemeSwitchingKeyGen(keys, lweSK);
@@ -122,8 +122,21 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGT(const CiphertextCKKS& a,
     // diff = a - b ; EvalCompare(0, diff) => 1 si diff > 0
     auto diff = cc->EvalSub(a, b);
     auto zero = cc->EvalSub(diff, diff);
+
     // PAS D'INVERSION : le résultat est déjà correct
-    return cc->EvalCompareSchemeSwitching(zero, diff, 1, 1);
+    return cc->EvalCompareSchemeSwitching(zero, diff, BATCH_SIZE, BATCH_SIZE);
+}
+
+CryptoEngine::CiphertextCKKS CryptoEngine::compareGT(const std::vector<double> a,
+                                                     const CiphertextCKKS& b) {
+    checkSwitchingReady();
+    // diff = a - b ; EvalCompare(0, diff) => 1 si diff > 0
+    PlaintextCKKS a_ = cc->MakeCKKSPackedPlaintext(a);
+    auto diff = cc->EvalSub(a_, b);
+    auto zero = cc->EvalSub(diff, diff);
+
+    // PAS D'INVERSION : le résultat est déjà correct
+    return cc->EvalCompareSchemeSwitching(zero, diff, BATCH_SIZE, BATCH_SIZE);
 }
 
 CryptoEngine::CiphertextCKKS CryptoEngine::compareValues(const CiphertextCKKS& a, 
@@ -246,7 +259,6 @@ CryptoEngine::CiphertextCKKS CryptoEngine::encryptVector(const std::vector<doubl
     return cc->Encrypt(keys.publicKey, pt);
 }
 
-
 double CryptoEngine::decryptValue(const CiphertextCKKS& ct) {
     checkInitialized();
     Plaintext pt;
@@ -277,6 +289,12 @@ CryptoEngine::CiphertextCKKS CryptoEngine::sub(const CiphertextCKKS& a, const Ci
 CryptoEngine::CiphertextCKKS CryptoEngine::mult(const CiphertextCKKS& a, const CiphertextCKKS& b) {
     checkInitialized();
     return cc->EvalMult(a, b);
+}
+
+CryptoEngine::CiphertextCKKS CryptoEngine::mult(const CiphertextCKKS& a, const std::vector<double> b) {
+    checkInitialized();
+    PlaintextCKKS b_ = cc->MakeCKKSPackedPlaintext(b);
+    return cc->EvalMult(a, b_);
 }
 
 CryptoEngine::CiphertextCKKS CryptoEngine::negate(const CiphertextCKKS& a) {

@@ -64,6 +64,7 @@ public:
     CiphertextCKKS add   (const CiphertextCKKS& a, const CiphertextCKKS& b);
     CiphertextCKKS sub   (const CiphertextCKKS& a, const CiphertextCKKS& b);
     CiphertextCKKS mult  (const CiphertextCKKS& a, const CiphertextCKKS& b);
+    CiphertextCKKS mult  (const CiphertextCKKS& a, const std::vector<double> b);
     CiphertextCKKS negate(const CiphertextCKKS& a);
     
     // Rotation and reduction
@@ -141,6 +142,7 @@ public:
     
     // Comparaisons strictes et non-strictes
     CiphertextCKKS compareGT(const CiphertextCKKS& a, const CiphertextCKKS& b);
+    CiphertextCKKS compareGT(const std::vector<double> a, const CiphertextCKKS& b);
     CiphertextCKKS compareGE(const CiphertextCKKS& a, const CiphertextCKKS& b);
     CiphertextCKKS compareLE(const CiphertextCKKS& a, const CiphertextCKKS& b);
 
