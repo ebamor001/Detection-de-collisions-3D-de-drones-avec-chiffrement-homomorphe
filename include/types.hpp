@@ -68,31 +68,41 @@ namespace DroneConstants {
 // Structure représentant un drone
 struct Drone{
     int id;
-
+    int NbSegments;
     std::vector<Segment> segments = {};
     std::vector<double> points = {};
-    double z; // altitude
+    double z;
 
-    // autres drones avec une relation Alice/Bob
+    // Autres drones avec une relation Alice/Bob
     std::vector<int> id_alice = {};
     std::vector<int> id_bob = {};
 
-    // Constructeurs
     Drone() : id(0), z(0) {}
-    Drone(int id_, double z_, std::vector<double>points_) : id(id_), z(z_), points(points_) {}
-    Drone(int id_, double z_, int nb_segments) : id(id_), z(z_){
-        int max_points = nb_segments * 3; 
-        GeneratePoints(max_points);
-        //GenerateSegments(&segments);
+
+    // Constructeur avec points fournis
+    Drone(int id_, std::vector<double>points_) : id(id_), points(points_) {
+        NbSegments = (points.size() / 3) - 1;
+        z = points[2];
+        GenerateSegments();
+    }
+
+    // Constructeur avec points aléatoires
+    Drone(int id_, double z_, int NbSegments_) : id(id_), z(z_), NbSegments(NbSegments_){
+        GeneratePoints();
+        GenerateSegments();
     }
 
     // Génération de points aléatoires
-    void GeneratePoints(int max){
+    void GeneratePoints(){
         static std::random_device rd;
         static std::mt19937 gen(rd());
         std::uniform_real_distribution<> dis(-99.0, 100.0);
         
-        for(int i=1; i<max+1; i++){
+        points.clear();
+        int max_points = (1 + NbSegments )* 3;
+
+        for(int i=1; i<max_points+1; i++){
+            // z est constant pour tous les segments
             if(i % 3 == 0){
                 points.push_back(z);
                 continue;
@@ -102,7 +112,29 @@ struct Drone{
         
     }
 
-    // Affichage
+    // Génération de segments
+    void GenerateSegments(){
+        segments.clear();
+        if (points.size() < 6) return; // Besoin d'au moins 2 points
+
+        auto point1 = IntPoint(points[0], points[1], points[2]);
+
+        for(int i=0; i<NbSegments;i++){
+            int j = 3*(i+1);
+            auto point2 = IntPoint(points[j], points[j+1], points[j+2]);
+            segments.push_back(std::make_pair(point1, point2));
+
+            // Le point d'arrivée devient le départ du suivant pour la continuité
+            point1 = point2;
+        }
+        
+    }
+    // Affichage d'un segment
+    void displaySegment(int i) {
+        std::cout << "Drone " << id << ": " << segments[i].first << " to " << segments[i].second << std::endl;
+    }
+    
+    //Affichage général
     friend std::ostream& operator<<(std::ostream& os, Drone& drone){
         os << "id : " << drone.id ;
         return os;
