@@ -461,3 +461,131 @@ CryptoEngine::CiphertextCKKS GeometryEngine::computeOrientation(
         return ct_val;
     }
 }
+// BATCHING : Détection collision spatio-temporelle
+
+// Partie 1a : distances au carré sur toute la trajectoire en une passe
+CryptoEngine::CiphertextCKKS GeometryEngine::computeDistancesBatchTemporal(
+    const std::vector<Point3D>& trajA,
+    const std::vector<Point3D>& trajB)
+{
+    size_t N = trajA.size();
+
+    // Encoder les N instants de chaque coordonnée
+    std::vector<double> dx(N), dy(N), dz(N);
+    for (size_t t = 0; t < N; t++) {
+        dx[t] = trajA[t].x - trajB[t].x;
+        dy[t] = trajA[t].y - trajB[t].y;
+        dz[t] = trajA[t].z - trajB[t].z;
+    }
+
+    // 1 slot = 1 instant de temps
+    auto ct_dx = engine->encryptVector(dx);
+    auto ct_dy = engine->encryptVector(dy);
+    auto ct_dz = engine->encryptVector(dz);
+
+    // d²(t) = dx²(t) + dy²(t) + dz²(t) pour tout t en parallèle
+    auto ct_dx2 = engine->mult(ct_dx, ct_dx);
+    auto ct_dy2 = engine->mult(ct_dy, ct_dy);
+    auto ct_dz2 = engine->mult(ct_dz, ct_dz);
+
+    return engine->add(engine->add(ct_dx2, ct_dy2), ct_dz2);
+}
+
+// Partie 1b : masque temporel
+CryptoEngine::CiphertextCKKS GeometryEngine::applyTemporalMask(
+    const CiphertextCKKS& distances,
+    size_t N,
+    size_t horizonSteps)
+{
+    // masque = [1,1,...,1,0,...,0]
+    std::vector<double> mask(N, 0.0);
+    for (size_t t = 0; t < horizonSteps && t < N; t++) {
+        mask[t] = 1.0;
+    }
+
+    // Multiplication ciphertext x plaintext (peu coûteuse)
+    auto cc = engine->getCKKSContext();
+    auto pt_mask = cc->MakeCKKSPackedPlaintext(mask);
+    return cc->EvalMult(distances, pt_mask);
+}
+
+// Partie 1c : y a-t-il un instant dangereux ?
+CryptoEngine::CiphertextCKKS GeometryEngine::detectCollisionInHorizon(
+    const CiphertextCKKS& maskedDistances,
+    double threshold)
+{
+    // 1 si d²(t) <= seuil² pour au moins un t
+    auto ct_thr = engine->constLike(maskedDistances, threshold * threshold);
+    return engine->compareLE(maskedDistances, ct_thr);
+}
+
+// Partie 2a : encoder toutes les candidates en un seul ciphertext
+CryptoEngine::CiphertextCKKS GeometryEngine::encodeCandidateAltitudes(
+    double currentAltitude,
+    double delta,
+    int k)
+{
+    // [z+Δ, z+2Δ, z-Δ, z-2Δ, ...]
+    std::vector<double> candidates;
+    for (int j = 1; j <= k/2; j++) {
+        candidates.push_back(currentAltitude + j * delta);
+        candidates.push_back(currentAltitude - j * delta);
+    }
+    return engine->encryptVector(candidates);
+}
+
+// Partie 2b : comparer toutes les candidates contre un drone en une passe
+CryptoEngine::CiphertextCKKS GeometryEngine::checkCandidatesAgainstDrone(
+    const CiphertextCKKS& candidates,
+    double droneAltitude,
+    double threshold)
+{
+    int k = engine->getSlotCount();
+
+    // Répéter l'altitude du drone sur tous les slots
+    std::vector<double> rep(k, droneAltitude);
+    auto ct_drone = engine->encryptVector(rep);
+
+    // δz²[j] = (candidate[j] - z_drone)² pour tout j en parallèle
+    auto ct_diff  = engine->sub(candidates, ct_drone);
+    auto ct_diff2 = engine->mult(ct_diff, ct_diff);
+
+    // Déchiffrer les distances pour comparer manuellement
+    // (compareGT ne fonctionne qu'en scalaire)
+    auto diffs = engine->decryptVector(ct_diff2);
+    double thr2 = threshold * threshold;
+
+    // Construire le vecteur de disponibilité en clair
+    std::vector<double> avail(k, 0.0);
+    for (int j = 0; j < k; j++) {
+        avail[j] = (diffs[j] > thr2) ? 1.0 : 0.0;
+    }
+
+    // Rechiffrer le résultat
+    return engine->encryptVector(avail);
+}
+// Partie 3 : sélectionner la meilleure altitude (déchiffrement nécessaire)
+double GeometryEngine::selectBestAltitude(
+    const CiphertextCKKS& availability,
+    double currentAltitude,
+    double delta,
+    int k)
+{
+    auto result = engine->decryptVector(availability);
+
+    // Reconstruire les candidates dans le même ordre
+    std::vector<double> candidates;
+    for (int j = 1; j <= k/2; j++) {
+        candidates.push_back(currentAltitude + j * delta);
+        candidates.push_back(currentAltitude - j * delta);
+    }
+
+    // Prendre la première candidate libre (déjà triée par |Δz| croissant)
+    for (size_t j = 0; j < result.size() && j < candidates.size(); j++) {
+        if (result[j] > 0.5) {
+            return candidates[j];
+        }
+    }
+
+    return currentAltitude; // aucune altitude libre, on reste
+}

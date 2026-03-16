@@ -40,7 +40,34 @@ public:
     
     std::vector<CiphertextCKKS> computeOrientationsBatch(
         const std::vector<std::tuple<IntPoint, IntPoint, IntPoint>>& triplets);
-    
+    // ===== BATCHING 3D =====
+    CiphertextCKKS computeDistancesBatchTemporal(
+        const Trajectory3D& trajA,
+        const Trajectory3D& trajB);
+
+    CiphertextCKKS applyTemporalMask(
+        const CiphertextCKKS& distances,
+        size_t N,
+        size_t horizonSteps);
+    CiphertextCKKS detectCollisionInHorizon(
+        const CiphertextCKKS& maskedDistances,
+        double threshold);
+
+    CiphertextCKKS encodeCandidateAltitudes(
+        double currentAltitude,
+        double delta,
+        int k);
+
+    CiphertextCKKS checkCandidatesAgainstDrone(
+        const CiphertextCKKS& candidates,
+        double droneAltitude,
+        double threshold);
+
+    double selectBestAltitude(
+        const CiphertextCKKS& availability,
+        double currentAltitude,
+        double delta,
+        int k);
     // Validation et stats
     bool validatePoints(const IntPoint& p, const IntPoint& q, const IntPoint& r) const;
     void printStats() const;

@@ -17,7 +17,9 @@ void CryptoEngine::initialize(const Config& cfg) {
     params.SetScalingTechnique(FLEXIBLEAUTO);
     params.SetSecurityLevel(HEStd_NotSet);   // sécurité gérée par ringDim fixé
     params.SetRingDim(8192);
-    params.SetBatchSize(BATCH_SIZE);                  // *** pas de batching ***
+    params.SetBatchSize(cfg.batchSize);                  // *** pas de batching ***
+    //params.SetBatchSize(1);                  // *** pas de batching ***
+    params.SetBatchSize(cfg.batchSize);
     params.SetSecretKeyDist(UNIFORM_TERNARY);
     params.SetKeySwitchTechnique(HYBRID);
     params.SetNumLargeDigits(3);
@@ -25,7 +27,9 @@ void CryptoEngine::initialize(const Config& cfg) {
     // Override config values with fixed ones
     config.multDepth = 17;
     config.scaleModSize = 50;
-    config.batchSize = BATCH_SIZE;
+    config.batchSize = cfg.batchSize;
+    //config.batchSize = 1;
+    config.batchSize = cfg.batchSize;
     config.ringDim = 8192;
 
     cc = GenCryptoContext(params);
@@ -253,6 +257,12 @@ CryptoEngine::CiphertextCKKS CryptoEngine::encryptValue(double value) {
     return cc->Encrypt(keys.publicKey, pt);
 }
 
+// CryptoEngine::CiphertextCKKS CryptoEngine::encryptVector(const std::vector<double>& v) {
+//     checkInitialized();
+//     std::vector<double> buf(1, v.empty() ? 0.0 : v[0]);
+//     auto pt = cc->MakeCKKSPackedPlaintext(buf);
+//     return cc->Encrypt(keys.publicKey, pt);
+// }
 CryptoEngine::CiphertextCKKS CryptoEngine::encryptVector(const std::vector<double>& v) {
     checkInitialized();
     auto pt = cc->MakeCKKSPackedPlaintext(v);
@@ -267,12 +277,20 @@ double CryptoEngine::decryptValue(const CiphertextCKKS& ct) {
     return cv.empty() ? 0.0 : cv[0].real();
 }
 
+// std::vector<double> CryptoEngine::decryptVector(const CiphertextCKKS& ct) {
+//     return {decryptValue(ct)};
+// }
 std::vector<double> CryptoEngine::decryptVector(const CiphertextCKKS& ct) {
     checkInitialized();
     Plaintext pt;
     cc->Decrypt(keys.secretKey, ct, &pt);
-    std::vector<double> cv = pt->GetRealPackedValue();
-    return cv;
+    pt->SetLength(config.batchSize);
+    auto cv = pt->GetCKKSPackedValue();
+    std::vector<double> result;
+    for (auto& c : cv) {
+        result.push_back(c.real());
+    }
+    return result;
 }
 
 // Arithmetic Operations
