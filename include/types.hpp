@@ -131,5 +131,4 @@ struct Drone{
 
 // Trajectoire 3D
 using Trajectory3D = std::vector<Point3D>;
->>>>>>> Stashed changes
 #endif // TYPES_HPP
