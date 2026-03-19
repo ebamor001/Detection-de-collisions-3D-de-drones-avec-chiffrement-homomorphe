@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drone HE — Démo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f6f7fb; }
+    .topbar { background:#111827; }
+    .page-header { background:#fff; border-bottom:1px solid #e5e7eb; }
+    .chip{display:inline-block;padding:.35rem .6rem;border-radius:999px;font-size:.85rem;background:#eef2ff;color:#3730a3;border:1px solid #e0e7ff;}
+    .card-soft{border:1px solid #e5e7eb;box-shadow:0 8px 22px rgba(17,24,39,0.06);border-radius:14px;}
+    .muted{color:#6b7280;}
+    .footer{background:#111827;color:#e5e7eb;}
+    .mock{
+      background: repeating-linear-gradient(
+        45deg,
+        #f3f4f6,
+        #f3f4f6 10px,
+        #eef2ff 10px,
+        #eef2ff 20px
+      );
+      border:1px dashed #c7d2fe;
+      border-radius:14px;
+      min-height:260px;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark topbar">
+  <div class="container">
+    <a class="navbar-brand fw-semibold" href="index.html">Drone HE</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div id="nav" class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto gap-lg-2">
+        <li class="nav-item"><a class="nav-link" href="index.html">Projet</a></li>
+        <li class="nav-item"><a class="nav-link" href="docs.html">Docs</a></li>
+        <li class="nav-item"><a class="nav-link active" href="demo.html">Démo</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<header class="page-header py-5">
+  <div class="container">
+    <h1 class="fw-bold mb-2">Démo / Simulateur</h1>
+    <p class="lead muted mb-0">Work in progress : la démo sera branchée dès que la pipeline C++ (CKKS + comparator) est stable.</p>
+  </div>
+</header>
+
+<section class="py-5">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="mock p-4 d-flex align-items-center justify-content-center text-center">
+          <div>
+            <div class="chip mb-2">UI Preview</div>
+            <h5 class="fw-bold mb-2">Zone simulateur (bientôt)</h5>
+            <p class="muted mb-0">Ici on dessinera / importera deux trajectoires et on lancera les tests.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card card-soft">
+          <div class="card-body">
+            <div class="chip mb-2">Fonctions prévues</div>
+            <ul class="muted mb-0">
+              <li>Création / import JSON de trajectoires</li>
+              <li>Intersection en clair (référence)</li>
+              <li>Intersection en mode confidentialité (HE)</li>
+              <li>Sortie : booléen collision + métriques (temps, tailles, opérations)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="card card-soft mt-4">
+          <div class="card-body">
+            <div class="chip mb-2">Métriques</div>
+            <div class="muted">Exemples affichés :</div>
+            <ul class="muted mb-0">
+              <li>Temps total / temps CKKS / temps comparator</li>
+              <li>Taille des ciphertexts échangés</li>
+              <li>Nombre de segments testés</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer text-center py-4">
+  Démo — Drone HE
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
