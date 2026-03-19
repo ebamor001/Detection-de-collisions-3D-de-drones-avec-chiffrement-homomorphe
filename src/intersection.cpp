@@ -47,7 +47,7 @@ IntersectionDetector::testSegmentIntersectionEncrypted(
     auto start = std::chrono::high_resolution_clock::now();
     
     // Utiliser directement la fonction de GeometryEngine qui fait tout
-    auto ct_result = geometry->checkSegmentIntersection(seg1, seg2);
+    auto ct_result = geometry->checkSegmentIntersection3D(seg1, seg2);
     
     auto end = std::chrono::high_resolution_clock::now();
     totalTime += end - start;
