@@ -31,17 +31,30 @@ public:
         double        guardGain;
         uint32_t      switchValues;
 
+        // avant batching
+        // Config()
+        //     : multDepth(18),
+        //       scaleModSize(50),
+        //       batchSize(1),
+        //       secLevel(HEStd_NotSet),
+        //       ringDim(8192),
+        //       slBin(TOY),
+        //       logQ_ccLWE(21),
+        //       scaleSign(64.0),
+        //       guardGain(1e4),
+        //       switchValues(4) {}
+        // apres batching
         Config()
-            : multDepth(18),
+            : multDepth(20),              // 18 -> 20 : marge pour cross product 3D
               scaleModSize(50),
-              batchSize(1),
+              batchSize(4096),            // 1 -> 4096 : utilise tous les slots (ringDim/2)
               secLevel(HEStd_NotSet),
               ringDim(8192),
               slBin(TOY),
-              logQ_ccLWE(21),
+              logQ_ccLWE(23),             // 21 -> 23 : minimum reel pour le scheme switching
               scaleSign(64.0),
               guardGain(1e4),
-              switchValues(4) {}
+              switchValues(4096) {}       // 4 -> 4096 : scheme switch traite tous les slots
     };
 
     CryptoEngine();
@@ -57,7 +70,11 @@ public:
     // I/O
     CiphertextCKKS encryptValue(double value);
     CiphertextCKKS encryptVector(const std::vector<double>& v);
-    std::vector<double> decryptVector(const CiphertextCKKS& ct);
+    // avant batching
+    // std::vector<double> decryptVector(const CiphertextCKKS& ct);
+    // apres batching
+    // parametre k ajoute : nombre de slots a lire (0 = tous)
+    std::vector<double> decryptVector(const CiphertextCKKS& ct, uint32_t k = 0);
     double             decryptValue(const CiphertextCKKS& ct);
 
     // Arithmetic
@@ -70,7 +87,7 @@ public:
     CiphertextCKKS rotate(const CiphertextCKKS& x, int32_t index);
     CiphertextCKKS sum4(const CiphertextCKKS& x);
     CiphertextCKKS sumAll(const CiphertextCKKS& x);
-    CiphertextCKKS reduce4ToSlot0(const CiphertextCKKS& x);  // NOUVEAU
+    CiphertextCKKS reduce4ToSlot0(const CiphertextCKKS& x);
 
     // Comparisons (scalar)
     CiphertextCKKS compareGreaterThanZero(const CiphertextCKKS& x);
@@ -96,7 +113,7 @@ public:
     CiphertextCKKS isZeroWithGuardScaled(const CiphertextCKKS& x, double tau, double gain);
 
     // Debug helpers
-    void debugDump(const char* tag, const CiphertextCKKS& x, int k = 4);  // NOUVEAU
+    void debugDump(const char* tag, const CiphertextCKKS& x, int k = 4);
 
     // Info / debug
     void   printParameters() const;
