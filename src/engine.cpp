@@ -11,9 +11,9 @@ void CryptoEngine::initialize(const Config& cfg) {
 
     CCParams<CryptoContextCKKSRNS> params;
 
-    // -- AVANT BATCHING --
+    // avant batching
     // params.SetMultiplicativeDepth(17);
-    // -- APRES BATCHING --
+    // apres batching
     // 17 -> 20 : marge pour le cross product 3D (+3 multiplications)
     params.SetMultiplicativeDepth(20);
 
@@ -23,9 +23,9 @@ void CryptoEngine::initialize(const Config& cfg) {
     params.SetSecurityLevel(HEStd_NotSet);
     params.SetRingDim(8192);
 
-    // -- AVANT BATCHING --
+    // avant batching
     // params.SetBatchSize(1);                  // 1 seule valeur par ciphertext
-    // -- APRES BATCHING --
+    // apres batching
     // config.batchSize = 4096 (ringDim/2 = nombre max de slots)
     // Le cout de chaque operation est IDENTIQUE que batchSize soit 1 ou 4096.
     params.SetBatchSize(config.batchSize);
@@ -34,12 +34,12 @@ void CryptoEngine::initialize(const Config& cfg) {
     params.SetKeySwitchTechnique(HYBRID);
     params.SetNumLargeDigits(3);
 
-    // -- AVANT BATCHING --
+    // avant batching
     // config.multDepth = 17;
     // config.scaleModSize = 50;
     // config.batchSize = 1;
     // config.ringDim = 8192;
-    // -- APRES BATCHING --
+    // apres batching
     config.multDepth    = 20;
     config.scaleModSize = 50;
     config.ringDim      = 8192;
@@ -55,9 +55,9 @@ void CryptoEngine::initialize(const Config& cfg) {
     keys = cc->KeyGen();
     cc->EvalMultKeyGen(keys.secretKey);
 
-    // -- AVANT BATCHING --
+    // avant batching
     // (rien - aucune cle de rotation en mode scalaire)
-    // -- APRES BATCHING --
+    // apres batching
     // Cles de rotation {1,-1,2,-2,...,2048,-2048} pour rotate(), sum4(), sumAll()
     if (config.batchSize > 1) {
         std::vector<int32_t> rotIndices;
@@ -72,9 +72,9 @@ void CryptoEngine::initialize(const Config& cfg) {
 
     initialized = true;
 
-    // -- AVANT BATCHING --
+    // avant batching
     // std::cout << "CryptoEngine initialized with switching-ready context (scalar mode)\n";
-    // -- APRES BATCHING --
+    // apres batching
     std::cout << "CryptoEngine initialized (batch mode, "
               << config.batchSize << " slots)\n";
     printParameters();
@@ -94,10 +94,10 @@ void CryptoEngine::setupSchemeSwitching() {
         }
         swp.SetCtxtModSizeFHEWLargePrec(config.logQ_ccLWE);
 
-        // -- AVANT BATCHING --
+        // avant batching
         // swp.SetNumSlotsCKKS(1);   // 1 seul slot par scheme switch
         // swp.SetNumValues(1);
-        // -- APRES BATCHING --
+        // apres batching
         // N slots convertis en UN seul appel = gain x150
         uint32_t numSlots = config.switchValues;
         swp.SetNumSlotsCKKS(numSlots);
@@ -117,9 +117,9 @@ void CryptoEngine::setupSchemeSwitching() {
         cc->EvalCompareSwitchPrecompute(pLWE, config.scaleSign);
 
         switchingReady = true;
-        // -- AVANT BATCHING --
+        // avant batching
         // std::cout << "Scheme switching setup complete (scalar mode)\n";
-        // -- APRES BATCHING --
+        // apres batching
         std::cout << "Scheme switching setup complete (batch mode, "
                   << numSlots << " slots)\n";
         std::cout << "[CE] pLWE=" << pLWE
@@ -133,7 +133,7 @@ void CryptoEngine::setupSchemeSwitching() {
     }
 }
 
-// Comparaisons derivees - INCHANGE (appellent compareGreaterThanZero qui est batche)
+// Comparaisons derivees (appellent compareGreaterThanZero qui est batche)
 CryptoEngine::CiphertextCKKS CryptoEngine::ltZero(const CiphertextCKKS& x) {
     return compareGreaterThanZero(cc->EvalNegate(x));
 }
@@ -161,9 +161,9 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGT(const CiphertextCKKS& a,
     checkSwitchingReady();
     auto diff = cc->EvalSub(a, b);
     auto zero = cc->EvalSub(diff, diff);
-    // -- AVANT BATCHING --
+    // avant batching
     // return cc->EvalCompareSchemeSwitching(zero, diff, 1, 1);
-    // -- APRES BATCHING --
+    // apres batching
     uint32_t numSlots = config.switchValues;
     return cc->EvalCompareSchemeSwitching(zero, diff, numSlots, numSlots);
 }
@@ -179,7 +179,6 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGEZero(const CiphertextCKKS& x
     return compareValues(x, zero);
 }
 
-// INCHANGE
 CryptoEngine::CiphertextCKKS CryptoEngine::isNearZeroBand(const CiphertextCKKS& x, double tau) {
     checkSwitchingReady();
     auto x_minus_tau = cc->EvalSub(x, constLike(x, tau));
@@ -249,9 +248,9 @@ CryptoEngine::CiphertextCKKS CryptoEngine::isNearZeroSquared(const CiphertextCKK
 CryptoEngine::CiphertextCKKS CryptoEngine::compareGreaterThanZero(const CiphertextCKKS& x) {
     checkSwitchingReady();
     auto zero = cc->EvalSub(x, x);
-    // -- AVANT BATCHING --
+    // avant batching
     // return cc->EvalCompareSchemeSwitching(zero, x, 1, 1);
-    // -- APRES BATCHING --
+    // apres batching
     uint32_t numSlots = config.switchValues;
     return cc->EvalCompareSchemeSwitching(zero, x, numSlots, numSlots);
 }
@@ -271,14 +270,14 @@ CryptoEngine::CiphertextCKKS CryptoEngine::encryptValue(double value) {
     return cc->Encrypt(keys.publicKey, pt);
 }
 
-// -- AVANT BATCHING --
+// avant batching
 // CryptoEngine::CiphertextCKKS CryptoEngine::encryptVector(const std::vector<double>& v) {
 //     checkInitialized();
 //     std::vector<double> buf(1, v.empty() ? 0.0 : v[0]);  // BUG: ne prend que v[0]
 //     auto pt = cc->MakeCKKSPackedPlaintext(buf);
 //     return cc->Encrypt(keys.publicKey, pt);
 // }
-// -- APRES BATCHING --
+// apres batching
 // Passe le vecteur COMPLET. encryptVector({1,2,3,4}) -> slots [1,2,3,4,0,...,0]
 CryptoEngine::CiphertextCKKS CryptoEngine::encryptVector(const std::vector<double>& v) {
     checkInitialized();
@@ -297,11 +296,11 @@ double CryptoEngine::decryptValue(const CiphertextCKKS& ct) {
     return cv.empty() ? 0.0 : cv[0].real();
 }
 
-// -- AVANT BATCHING --
+// avant batching
 // std::vector<double> CryptoEngine::decryptVector(const CiphertextCKKS& ct) {
 //     return {decryptValue(ct)};  // BUG: retourne toujours taille 1
 // }
-// -- APRES BATCHING --
+// apres batching
 // Lit les k premiers slots. Signature changee: parametre k ajoute.
 std::vector<double> CryptoEngine::decryptVector(const CiphertextCKKS& ct, uint32_t k) {
     checkInitialized();
@@ -317,7 +316,7 @@ std::vector<double> CryptoEngine::decryptVector(const CiphertextCKKS& ct, uint32
     return result;
 }
 
-// Arithmetique - INCHANGE
+// Arithmetique (inchange, deja slot-parallele)
 CryptoEngine::CiphertextCKKS CryptoEngine::add(const CiphertextCKKS& a, const CiphertextCKKS& b) {
     checkInitialized();
     return cc->EvalAdd(a, b);
@@ -338,9 +337,7 @@ CryptoEngine::CiphertextCKKS CryptoEngine::negate(const CiphertextCKKS& a) {
     return cc->EvalNegate(a);
 }
 
-// =========================================================
-// NOUVEAU - Rotations (n'existait pas avant batching)
-// =========================================================
+// Rotations (nouveau, n'existait pas avant batching)
 
 CryptoEngine::CiphertextCKKS CryptoEngine::rotate(const CiphertextCKKS& x, int32_t index) {
     checkInitialized();
@@ -369,9 +366,7 @@ CryptoEngine::CiphertextCKKS CryptoEngine::reduce4ToSlot0(const CiphertextCKKS& 
     return sum4(x);
 }
 
-// =========================================================
-// NOUVEAU - Comparaison batchee avec kSlots explicite
-// =========================================================
+// Comparaison batchee avec kSlots explicite (nouveau)
 
 CryptoEngine::CiphertextCKKS CryptoEngine::compareGtZeroPacked(
     const CiphertextCKKS& xPacked, uint32_t kSlots) {
@@ -380,9 +375,7 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGtZeroPacked(
     return cc->EvalCompareSchemeSwitching(zero, xPacked, kSlots, kSlots);
 }
 
-// =========================================================
-// NOUVEAU - Debug helper
-// =========================================================
+// Debug helper (nouveau)
 
 void CryptoEngine::debugDump(const char* tag, const CiphertextCKKS& x, int k) {
     auto vals = decryptVector(x, k);
@@ -394,7 +387,7 @@ void CryptoEngine::debugDump(const char* tag, const CiphertextCKKS& x, int k) {
     std::cout << "]" << std::endl;
 }
 
-// Guard band - EvalCompareSchemeSwitching utilise numSlots
+// Guard band (EvalCompareSchemeSwitching utilise numSlots)
 CryptoEngine::CiphertextCKKS
 CryptoEngine::isZeroWithGuardScaled(const CiphertextCKKS& x, double tau, double gain) {
     checkSwitchingReady();
@@ -409,10 +402,10 @@ CryptoEngine::isZeroWithGuardScaled(const CiphertextCKKS& x, double tau, double 
     auto y_minus = cc->EvalSub(xScaled, ptTN);
     auto zP = cc->EvalSub(y_plus,  y_plus);
     auto zM = cc->EvalSub(y_minus, y_minus);
-    // -- AVANT BATCHING --
+    // avant batching
     // auto gtPos = cc->EvalCompareSchemeSwitching(zP, y_plus,  1, 1);
     // auto gtNeg = cc->EvalCompareSchemeSwitching(zM, y_minus, 1, 1);
-    // -- APRES BATCHING --
+    // apres batching
     uint32_t numSlots = config.switchValues;
     auto gtPos = cc->EvalCompareSchemeSwitching(zP, y_plus,  numSlots, numSlots);
     auto gtNeg = cc->EvalCompareSchemeSwitching(zM, y_minus, numSlots, numSlots);
@@ -433,9 +426,9 @@ void CryptoEngine::printParameters() const {
         std::cout << "Engine not initialized\n";
         return;
     }
-    // -- AVANT BATCHING --
+    // avant batching
     // std::cout << "\n=== CKKS Parameters (Scalar Mode) ===\n";
-    // -- APRES BATCHING --
+    // apres batching
     std::cout << "\n=== CKKS Parameters (Batch Mode) ===\n";
     std::cout << "Ring dimension: " << cc->GetRingDimension() << "\n";
     std::cout << "Multiplicative depth: " << config.multDepth << "\n";
