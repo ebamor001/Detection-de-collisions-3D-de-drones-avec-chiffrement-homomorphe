@@ -165,9 +165,10 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGT(const CiphertextCKKS& a,
     // return cc->EvalCompareSchemeSwitching(zero, diff, 1, 1);
     // apres batching
     uint32_t numSlots = config.switchValues;
-    return cc->EvalCompareSchemeSwitching(zero, diff, numSlots, numSlots);
+    uint32_t padded = 1;
+    while (padded < numSlots) padded *= 2;
+    return cc->EvalCompareSchemeSwitching(zero, diff, padded, padded);
 }
-
 CryptoEngine::CiphertextCKKS CryptoEngine::compareValues(const CiphertextCKKS& a,
                                                          const CiphertextCKKS& b) {
     return compareGE(a, b);
@@ -252,7 +253,10 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGreaterThanZero(const Cipherte
     // return cc->EvalCompareSchemeSwitching(zero, x, 1, 1);
     // apres batching
     uint32_t numSlots = config.switchValues;
-    return cc->EvalCompareSchemeSwitching(zero, x, numSlots, numSlots);
+    // OpenFHE exige une puissance de 2
+    uint32_t padded = 1;
+    while (padded < numSlots) padded *= 2;
+    return cc->EvalCompareSchemeSwitching(zero, x, padded, padded);
 }
 
 CryptoEngine::CiphertextCKKS CryptoEngine::compareLEZero(const CiphertextCKKS& x) {
@@ -371,8 +375,12 @@ CryptoEngine::CiphertextCKKS CryptoEngine::reduce4ToSlot0(const CiphertextCKKS& 
 CryptoEngine::CiphertextCKKS CryptoEngine::compareGtZeroPacked(
     const CiphertextCKKS& xPacked, uint32_t kSlots) {
     checkSwitchingReady();
+    // OpenFHE exige que numSlots soit une puissance de 2
+    // on arrondit kSlots a la puissance de 2 superieure
+    uint32_t padded = 1;
+    while (padded < kSlots) padded *= 2;
     auto zero = cc->EvalSub(xPacked, xPacked);
-    return cc->EvalCompareSchemeSwitching(zero, xPacked, kSlots, kSlots);
+    return cc->EvalCompareSchemeSwitching(zero, xPacked, padded, padded);
 }
 
 // Debug helper (nouveau)
@@ -407,6 +415,8 @@ CryptoEngine::isZeroWithGuardScaled(const CiphertextCKKS& x, double tau, double 
     // auto gtNeg = cc->EvalCompareSchemeSwitching(zM, y_minus, 1, 1);
     // apres batching
     uint32_t numSlots = config.switchValues;
+    uint32_t padded = 1;
+    while (padded < numSlots) padded *= 2;
     auto gtPos = cc->EvalCompareSchemeSwitching(zP, y_plus,  numSlots, numSlots);
     auto gtNeg = cc->EvalCompareSchemeSwitching(zM, y_minus, numSlots, numSlots);
     auto one = cc->EvalSub(gtPos, gtPos);
