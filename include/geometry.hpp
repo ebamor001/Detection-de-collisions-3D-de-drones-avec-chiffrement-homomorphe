@@ -36,6 +36,10 @@ public:
     CiphertextCKKS onSegment2D(const IntPoint& p, const IntPoint& q, const IntPoint& r,DropAxis drop, double eps);
     CiphertextCKKS checkSegmentIntersection2D(const Segment& seg1, const Segment& seg2, DropAxis drop);
     CiphertextCKKS checkSegmentIntersection3D(const Segment& seg1, const Segment& seg2);
+// nouveau : version batchee (N paires en parallele)
+    std::vector<double> batchCheckIntersection3D(
+        const Segment& mySeg,
+        const std::vector<Segment>& neighbors);
 
 
     // ===== 3) Validation / stats =====
