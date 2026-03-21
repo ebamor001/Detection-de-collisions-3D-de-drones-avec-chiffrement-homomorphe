@@ -41,7 +41,36 @@ public:
         const Segment& mySeg,
         const std::vector<Segment>& neighbors);
 
+    // ===== BATCHING : Évitement d'altitude =====
+    CiphertextCKKS computeDistancesBatchTemporal(
+        const Trajectory3D& trajA,
+        const Trajectory3D& trajB);
 
+    CiphertextCKKS applyTemporalMask(
+        const CiphertextCKKS& distances,
+        size_t N,
+        size_t horizonSteps);
+
+    CiphertextCKKS detectCollisionInHorizon(
+        const CiphertextCKKS& maskedDistances,
+        double threshold);
+
+    CiphertextCKKS encodeCandidateAltitudes(
+        double currentAltitude,
+        double delta,
+        int k);
+
+    CiphertextCKKS checkCandidatesAgainstDrone(
+        const CiphertextCKKS& candidates,
+        double droneAltitude,
+        double threshold,
+        int numCandidates);
+
+    double selectBestAltitude(
+        const CiphertextCKKS& availability,
+        double currentAltitude,
+        double delta,
+        int k);
     // ===== 3) Validation / stats =====
     bool validatePoints(const IntPoint& p, const IntPoint& q, const IntPoint& r) const;
     void printStats() const;

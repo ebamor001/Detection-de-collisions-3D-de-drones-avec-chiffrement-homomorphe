@@ -55,5 +55,13 @@ namespace DroneConstants {
     constexpr long MIN_COORDINATE = -99;
     constexpr size_t DEFAULT_BATCH_SIZE = 8;  // Pour vectorisation CKKS
 }
+// Point 3D pour les trajectoires de drones
+struct Point3D {
+    double x, y, z;
+    Point3D() : x(0), y(0), z(0) {}
+    Point3D(double x_, double y_, double z_) : x(x_), y(y_), z(z_) {}
+};
+
+using Trajectory3D = std::vector<Point3D>;
 
 #endif // TYPES_HPP

@@ -549,5 +549,114 @@ void GeometryEngine::printStats() const {
     std::cout << "Bootstrap count: " << bootstrapCount
               << " (avg " << avg << " per test)" << std::endl;
 }
+// ============================================================
+// BATCHING : Détection collision + évitement d'altitude
+// ============================================================
 
+CryptoEngine::CiphertextCKKS GeometryEngine::computeDistancesBatchTemporal(
+    const Trajectory3D& trajA,
+    const Trajectory3D& trajB)
+{
+    size_t N = trajA.size();
+    std::vector<double> dx(N), dy(N), dz(N);
+    for (size_t t = 0; t < N; t++) {
+        dx[t] = trajA[t].x - trajB[t].x;
+        dy[t] = trajA[t].y - trajB[t].y;
+        dz[t] = trajA[t].z - trajB[t].z;
+    }
+    auto ct_dx = engine->encryptVector(dx);
+    auto ct_dy = engine->encryptVector(dy);
+    auto ct_dz = engine->encryptVector(dz);
+    auto ct_dx2 = engine->mult(ct_dx, ct_dx);
+    auto ct_dy2 = engine->mult(ct_dy, ct_dy);
+    auto ct_dz2 = engine->mult(ct_dz, ct_dz);
+    return engine->add(engine->add(ct_dx2, ct_dy2), ct_dz2);
+}
+
+CryptoEngine::CiphertextCKKS GeometryEngine::applyTemporalMask(
+    const CiphertextCKKS& distances,
+    size_t N,
+    size_t horizonSteps)
+{
+    std::vector<double> mask(N, 0.0);
+    for (size_t t = 0; t < horizonSteps && t < N; t++)
+        mask[t] = 1.0;
+    auto cc = engine->getCKKSContext();
+    auto pt_mask = cc->MakeCKKSPackedPlaintext(mask);
+    return cc->EvalMult(distances, pt_mask);
+}
+
+CryptoEngine::CiphertextCKKS GeometryEngine::detectCollisionInHorizon(
+    const CiphertextCKKS& maskedDistances,
+    double threshold)
+{
+    auto ct_thr = engine->constLike(maskedDistances, threshold * threshold);
+    return engine->compareLE(maskedDistances, ct_thr);
+}
+
+CryptoEngine::CiphertextCKKS GeometryEngine::encodeCandidateAltitudes(
+    double currentAltitude,
+    double delta,
+    int k)
+{
+    std::vector<double> candidates;
+    for (int j = 1; j <= k/2; j++) {
+        candidates.push_back(currentAltitude + j * delta);
+        candidates.push_back(currentAltitude - j * delta);
+    }
+    return engine->encryptVector(candidates);
+}
+
+CryptoEngine::CiphertextCKKS GeometryEngine::checkCandidatesAgainstDrone(
+    const CiphertextCKKS& candidates,
+    double droneAltitude,
+    double threshold,
+    int numCandidates)
+{
+    int totalSlots = engine->getSlotCount();
+
+    std::vector<double> rep(totalSlots, droneAltitude);
+    auto ct_drone = engine->encryptVector(rep);
+
+    auto ct_diff  = engine->sub(candidates, ct_drone);
+    auto ct_diff2 = engine->mult(ct_diff, ct_diff);
+
+    std::vector<double> thrVec(totalSlots, threshold * threshold);
+    auto ct_thr = engine->encryptVector(thrVec);
+
+    auto ct_diff_minus_thr = engine->sub(ct_diff2, ct_thr);
+
+    // Normaliser pour ramener dans [-1, 1] avant compareGtZeroPacked
+    // On divise par une valeur > max possible de diff_minus_thr
+    // max diff = (180-120)² - 15² = 3600 - 225 = 3375, on prend 10000
+    int totalSlotsN = engine->getSlotCount();
+    std::vector<double> normVec(totalSlotsN, 1.0 / 10000.0);
+    auto cc = engine->getCKKSContext();
+    auto pt_norm = cc->MakeCKKSPackedPlaintext(normVec);
+    auto ct_normalized = cc->EvalMult(ct_diff_minus_thr, pt_norm);
+
+    int padded = 1;
+    while (padded < numCandidates) padded *= 2;
+
+    return engine->compareGtZeroPacked(ct_normalized, padded);
+}
+
+double GeometryEngine::selectBestAltitude(
+    const CiphertextCKKS& availability,
+    double currentAltitude,
+    double delta,
+    int k)
+{
+    auto result = engine->decryptVector(availability);
+    std::vector<double> candidates;
+    for (int j = 1; j <= k/2; j++) {
+        candidates.push_back(currentAltitude + j * delta);
+        candidates.push_back(currentAltitude - j * delta);
+    }
+    for (size_t j = 0; j < result.size() && j < candidates.size(); j++) {
+        if (result[j] > 0.5)
+            return candidates[j];
+    }
+    return currentAltitude;
+}
 
