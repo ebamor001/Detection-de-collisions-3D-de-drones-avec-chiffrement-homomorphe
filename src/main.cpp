@@ -216,7 +216,7 @@ static void testIntersectionGeneral(CryptoEngine& engine, GeometryEngine& geo) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 7. Cas colinéaires
+// 7. Cas colinéairesS
 // ─────────────────────────────────────────────────────────────────────────────
 
 static void testIntersectionCollinear(CryptoEngine& engine, GeometryEngine& geo) {
