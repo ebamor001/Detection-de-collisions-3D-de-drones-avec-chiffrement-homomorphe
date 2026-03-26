@@ -256,7 +256,7 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
         print(f"[{self.address_string()}] {fmt % args}")
 
 # ── Serveur multi-threadé ─────────────────────────────────────────────────────
-# ThreadingTCPServer = chaque requête dans son propre thread
+# ThreadingTCPServer = chaque requête dan
 # → le serveur reste joignable (health check) pendant un calcul FHE long
 
 class ThreadedServer(socketserver.ThreadingTCPServer):
@@ -269,7 +269,7 @@ if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     binary_ok = os.path.isfile(BINARY_PATH)
     print(f"╔══════════════════════════════════════════════════╗")
-    print(f"║   Drone HE — Serveur local (multi-thread)       ║")
+    print(f"║   Drone HE — Serveur local (multi-thread)       ")
     print(f"╠══════════════════════════════════════════════════╣")
     print(f"║  URL    : http://localhost:{PORT}                   ║")
     print(f"║  Démo   : http://localhost:{PORT}/web/demo.html      ║")
