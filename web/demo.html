@@ -209,12 +209,14 @@
         <div class="card-ttl">Résultat <span id="mode-badge"></span></div>
         <div id="verdict" class="verdict">—</div>
         <table class="metrics">
-          <tr><td>Segments testés</td>   <td id="m-segs">—</td></tr>
-          <tr><td>Temps total (FHE)</td> <td id="m-time">—</td></tr>
-          <tr><td>Scheme switches</td>   <td id="m-sw">—</td></tr>
-          <tr><td>Taille ciphertexts</td><td id="m-ct">—</td></tr>
-          <tr><td>Contrôle en clair</td> <td id="m-clear">—</td></tr>
-          <tr><td>Overhead FHE/clair</td><td id="m-overhead">—</td></tr>
+          <tr><td>Segments testés</td>         <td id="m-segs">—</td></tr>
+          <tr><td>Temps total (FHE)</td>       <td id="m-time">—</td></tr>
+          <tr><td>Scheme switches (batch)</td> <td id="m-sw">—</td></tr>
+          <tr><td>SS sans batching</td>        <td id="m-sw-nb">—</td></tr>
+          <tr><td>Gain batching</td>           <td id="m-gain">—</td></tr>
+          <tr><td>Taille ciphertexts</td>      <td id="m-ct">—</td></tr>
+          <tr><td>Contrôle en clair</td>       <td id="m-clear">—</td></tr>
+          <tr><td>Overhead FHE/clair</td>      <td id="m-overhead">—</td></tr>
         </table>
         <div style="margin-top:.9rem">
           <div class="pb-row">
@@ -595,13 +597,18 @@ function showResult(d) {
 
   // Badge mode
   const b = document.getElementById("mode-badge");
-  b.textContent  = (d.mode==="binary"||d.mode==="binary_text") ? "FHE réel" : "métriques FHE estimées";
-  b.className    = (d.mode==="binary"||d.mode==="binary_text") ? "mode-b" : "mode-s";
+  b.textContent = (d.mode==="binary"||d.mode==="binary_text")
+    ? "FHE réel" : "détection 3D · métriques FHE estimées";
+  b.className = (d.mode==="binary"||d.mode==="binary_text") ? "mode-b" : "mode-s";
 
   // Metrics
   document.getElementById("m-segs").textContent  = d.segments_tested;
   document.getElementById("m-time").textContent  = fmtTime(d.time_ms);
-  document.getElementById("m-sw").textContent    = d.scheme_switches;
+  document.getElementById("m-sw").textContent    = d.scheme_switches + " SS";
+  document.getElementById("m-sw-nb").textContent = (d.scheme_switches_no_batch ?? "—") + " SS";
+  document.getElementById("m-gain").textContent  = d.batching_gain
+    ? "×" + d.batching_gain + " 🚀"
+    : "—";
   document.getElementById("m-ct").textContent    = d.ciphertext_size_kb + " KB";
   const clearTxt = d.collision_clear
     ? `⚠ collision (${d.time_clear_ms ?? "< 1"} ms)`
@@ -619,11 +626,15 @@ function showResult(d) {
   animBar("b-oh",  "v-oh",   Math.min(100,Math.log10(d.time_ms/0.01+1)*25),
           v=>(Math.pow(10,v/25)-.99).toFixed(0)+"×");
 
-  // Détails
+  // Détails collision 3D
   if (hitSegs.length) {
     document.getElementById("col-details").style.display = "block";
     document.getElementById("col-list").textContent =
-      hitSegs.map(h=>`seg D1[${h.seg1}→${h.seg1+1}] ∩ seg D2[${h.seg2}→${h.seg2+1}]`).join("\n");
+      hitSegs.map(h => {
+        let line = `seg D1[${h.seg1}→${h.seg1+1}] ∩ seg D2[${h.seg2}→${h.seg2+1}]`;
+        if (h.dist !== undefined) line += `  dist=${h.dist}`;
+        return line;
+      }).join("\n");
   } else {
     document.getElementById("col-details").style.display = "none";
   }
