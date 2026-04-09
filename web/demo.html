@@ -54,6 +54,7 @@
     .btn-t:hover { border-color:var(--accent); color:var(--accent); }
     .btn-t.d1 { background:#e0f2fe; border-color:var(--accent); color:var(--accent); }
     .btn-t.d2 { background:#ede9fe; border-color:var(--accent2); color:var(--accent2); }
+    .btn-t.d3 { background:#dcfce7; border-color:#10b981; color:#10b981; }
     #three-canvas { display:block; width:100%; height:460px; cursor:crosshair; }
 
     /* Z SLIDER */
@@ -80,6 +81,545 @@
     #btn-analyze:disabled { opacity:.4; cursor:not-allowed; }
 
     /* VERDICT */
+    #result-card { display:none; }
+    .verdict { font-family:var(--mono); font-size:1.3rem; font-weight:600; text-align:center; padding:.8rem; border-radius:10px; margin-bottom:.9rem; }
+    .verdict.col  { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+    .verdict.nocol{ background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+
+    /* METRICS */
+    .metrics { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:.8rem; }
+    .metrics tr { border-bottom:1px solid var(--border); }
+    .metrics tr:last-child { border-bottom:none; }
+    .metrics td { padding:.45rem .25rem; }
+    .metrics td:first-child { color:var(--muted); width:58%; }
+    .metrics td:last-child  { color:var(--text); text-align:right; font-weight:600; }
+
+    /* PROGRESS */
+    .pb-row { margin-bottom:.45rem; }
+    .pb-lbl { display:flex; justify-content:space-between; font-family:var(--mono); font-size:.68rem; color:var(--muted); margin-bottom:.2rem; }
+    .pb-track { height:5px; border-radius:99px; background:#e2e8f0; overflow:hidden; }
+    .pb-fill  { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent),var(--accent2)); width:0; transition:width .8s ease; }
+
+    /* LOG */
+    #log-box { font-family:var(--mono); font-size:.7rem; color:#16a34a; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:.6rem; max-height:120px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; display:none; }
+
+    /* SPINNER */
+    .spin { width:15px; height:15px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; display:inline-block; vertical-align:middle; margin-right:.4rem; }
+    @keyframes sp { to { transform:rotate(360deg); } }
+
+    /* LEGEND */
+    .leg { display:flex; gap:.8rem; flex-wrap:wrap; }
+    .leg-i { display:flex; align-items:center; gap:.35rem; font-family:var(--mono); font-size:.72rem; color:var(--muted); }
+    .dot { width:9px; height:9px; border-radius:50%; }
+
+    .mode-b { font-family:var(--mono); font-size:.63rem; padding:.12rem .45rem; border-radius:4px; background:#dcfce7; color:#15803d; margin-left:.3rem; }
+    .mode-s { font-family:var(--mono); font-size:.63rem; padding:.12rem .45rem; border-radius:4px; background:#ede9fe; color:#7c3aed; margin-left:.3rem; }
+
+    footer { border-top:1px solid var(--border); padding:1.4rem 0; text-align:center; font-family:var(--mono); font-size:.73rem; color:var(--muted); background:#fff; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="navbar navbar-expand-lg topbar">
+  <div class="container">
+    <a class="navbar-brand" href="index.html">drone_he</a>
+    <button class="navbar-toggler border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div id="nav" class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto gap-lg-2">
+        <li class="nav-item"><a class="nav-link" href="index.html">Projet</a></li>
+        <li class="nav-item"><a class="nav-link" href="docs.html">Docs</a></li>
+        <li class="nav-item"><a class="nav-link active" href="demo.html">Démo</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<header class="page-header">
+  <div class="container">
+    <h1>Démonstrateur 3D — Détection HE</h1>
+    <p>On choisit des waypoints en 3D pour chaque drone, puis on  lance l'analyse chiffrée.</p>
+    <div id="server-badge">
+      <span id="server-dot"></span>
+      <span id="server-status">Vérification du serveur…</span>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="container">
+  <div class="demo-grid">
+
+    <!-- ── SCÈNE 3D ── -->
+    <div class="scene-panel">
+      <div class="scene-toolbar">
+        <span class="lbl">Drone :</span>
+        <button class="btn-t d1" id="btn-d1" onclick="setDrone(1)">🔵 Drone 1</button>
+        <button class="btn-t"    id="btn-d2" onclick="setDrone(2)">🟣 Drone 2</button>
+        <button class="btn-t"    id="btn-d3" onclick="setDrone(3)">🟢 Drone 3</button>
+        <span class="lbl" style="margin-left:.4rem">|</span>
+        <button class="btn-t" onclick="undoLast()">↩ Undo</button>
+        <button class="btn-t" onclick="clearAll()">✕ Reset</button>
+        <span class="lbl" style="margin-left:.4rem">|</span>
+        <button class="btn-t" onclick="loadExample()">⚡ Exemple</button>
+        <span class="lbl" style="margin-left:auto" id="pt-count">D1: 0 — D2: 0 — D3: 0</span>
+      </div>
+
+      <!-- Three.js canvas -->
+      <canvas id="three-canvas"></canvas>
+
+      <!-- Altitude slider -->
+      <div class="z-row">
+        <label>Altitude Z :</label>
+        <input type="range" id="z-slider" min="0" max="99" value="50" oninput="updateZ()">
+        <span id="z-val">50</span>
+      </div>
+      <div class="hint-bar">
+        Clic gauche = ajouter waypoint · Clic droit + drag = orbiter · Scroll = zoom
+      </div>
+    </div>
+
+    <!-- ── SIDE ── -->
+    <div class="side-panel">
+
+      <!-- Légende -->
+      <div class="card-w">
+        <div class="card-ttl">Légende</div>
+        <div class="leg">
+          <div class="leg-i"><div class="dot" style="background:#0ea5e9"></div>Drone 1</div>
+          <div class="leg-i"><div class="dot" style="background:#6366f1"></div>Drone 2</div>
+          <div class="leg-i"><div class="dot" style="background:#10b981"></div>Drone 3</div>
+          <div class="leg-i"><div class="dot" style="background:#ef4444"></div>Collision</div>
+        </div>
+      </div>
+
+      <!-- Waypoints -->
+      <div class="card-w">
+        <div class="card-ttl">Waypoints</div>
+        <div class="path-list" id="path-list"><span style="color:var(--muted)">Aucun point posé.</span></div>
+      </div>
+
+      <!-- Analyser -->
+      <button id="btn-analyze" disabled onclick="analyze()">
+        Analyser les trajectoires
+      </button>
+
+      <!-- Résultat -->
+      <div class="card-w" id="result-card">
+        <div class="card-ttl">Résultat <span id="mode-badge"></span></div>
+        <div id="verdict" class="verdict">—</div>
+        <table class="metrics">
+          <tr><td>Paires testées</td>    <td id="m-segs">—</td></tr>
+          <tr><td>Temps total (FHE)</td> <td id="m-time">—</td></tr>
+          <tr><td>Scheme switches</td>   <td id="m-sw">—</td></tr>
+          <tr><td>Taille ciphertexts</td><td id="m-ct">—</td></tr>
+        </table>
+        <div id="col-details" style="margin-top:.7rem;display:none">
+          <div class="card-ttl" style="margin-bottom:.3rem">Segments en collision</div>
+          <div id="col-list" style="font-family:var(--mono);font-size:.72rem;color:#d97706"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>Projet S8 — Homomorphic Encryption &amp; Drone Safety · drone_he</footer>
+
+<!-- Three.js r128 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════════
+const API      = "http://localhost:8765";
+const GRID     = 100;
+const C1       = 0x0ea5e9;
+const C2       = 0x6366f1;
+const C3       = 0x10b981;
+const CHIT     = 0xef4444;
+
+// ═══════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════
+let activeDrone = 1;
+let paths = { 1: [], 2: [], 3: [] };   // [[x,y,z], ...]
+let currentZ = 50;
+let hitSegs = [];
+
+// ═══════════════════════════════════════════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════════════════════════════════════════
+const container = document.getElementById("three-canvas");
+const renderer  = new THREE.WebGLRenderer({ canvas: container, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0xf8fafc, 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2000);
+camera.position.set(180, 160, 180);
+camera.lookAt(50, 50, 50);
+
+// ── Resize ──────────────────────────────────────────────────────────
+function resizeRenderer() {
+  const w = container.parentElement.clientWidth;
+  const h = 460;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resizeRenderer);
+resizeRenderer();
+
+// ── Grid / axes ─────────────────────────────────────────────────────
+function makeGrid() {
+  const mat = new THREE.LineBasicMaterial({ color: 0xdde1e9 });
+  const step = 20;
+  const g = new THREE.Group();
+  for (let i = 0; i <= GRID; i += step) {
+    // XZ ground plane
+    const xz = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(i, 0, 0), new THREE.Vector3(i, 0, GRID),
+      new THREE.Vector3(0, 0, i), new THREE.Vector3(GRID, 0, i)
+    ]);
+    // Deux lignes séparées
+    [[new THREE.Vector3(i,0,0),new THREE.Vector3(i,0,GRID)],
+     [new THREE.Vector3(0,0,i),new THREE.Vector3(GRID,0,i)]].forEach(pts => {
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      g.add(new THREE.Line(geo, mat));
+    });
+  }
+  // Axes colorés
+  const axMat = c => new THREE.LineBasicMaterial({color:c});
+  [[new THREE.Vector3(0,0,0),new THREE.Vector3(GRID,0,0), 0xff4444],
+   [new THREE.Vector3(0,0,0),new THREE.Vector3(0,GRID,0), 0x44bb44],
+   [new THREE.Vector3(0,0,0),new THREE.Vector3(0,0,GRID), 0x4488ff]
+  ].forEach(([a,b,c]) => {
+    const geo = new THREE.BufferGeometry().setFromPoints([a,b]);
+    g.add(new THREE.Line(geo, axMat(c)));
+  });
+  scene.add(g);
+}
+makeGrid();
+
+// ── Orbit controls (manuel, sans import) ────────────────────────────
+let isOrbiting = false, lastMouse = {x:0,y:0};
+let theta = 0.6, phi = 0.8, radius = 220;
+const center = new THREE.Vector3(50, 40, 50);
+
+function updateCamera() {
+  camera.position.set(
+    center.x + radius * Math.sin(phi) * Math.sin(theta),
+    center.y + radius * Math.cos(phi),
+    center.z + radius * Math.sin(phi) * Math.cos(theta)
+  );
+  camera.lookAt(center);
+}
+updateCamera();
+
+container.addEventListener("contextmenu", e => e.preventDefault());
+container.addEventListener("mousedown",   e => { if(e.button===2){ isOrbiting=true; lastMouse={x:e.clientX,y:e.clientY}; } });
+window.addEventListener   ("mouseup",     e => { if(e.button===2) isOrbiting=false; });
+window.addEventListener   ("mousemove",   e => {
+  if (!isOrbiting) return;
+  const dx = (e.clientX - lastMouse.x) * .008;
+  const dy = (e.clientY - lastMouse.y) * .008;
+  theta -= dx;
+  phi    = Math.max(.1, Math.min(Math.PI-.1, phi + dy));
+  lastMouse = {x:e.clientX, y:e.clientY};
+  updateCamera();
+});
+container.addEventListener("wheel", e => {
+  radius = Math.max(60, Math.min(500, radius + e.deltaY * .3));
+  updateCamera();
+}, {passive:true});
+
+// ── Raycasting pour clic sur plan XZ à hauteur Z ────────────────────
+const raycaster  = new THREE.Raycaster();
+const planeNorm  = new THREE.Vector3(0, 1, 0);
+
+container.addEventListener("click", e => {
+  if (e.button !== 0) return;
+  const rect = container.getBoundingClientRect();
+  const ndc  = new THREE.Vector2(
+    ((e.clientX - rect.left) / rect.width)  * 2 - 1,
+   -((e.clientY - rect.top)  / rect.height) * 2 + 1
+  );
+  raycaster.setFromCamera(ndc, camera);
+  const plane = new THREE.Plane(planeNorm, -currentZ);
+  const hit   = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(plane, hit)) return;
+
+  // Clamper dans [0, GRID]
+  const x = Math.round(Math.max(0, Math.min(GRID, hit.x)));
+  const z = Math.round(Math.max(0, Math.min(GRID, hit.z)));
+  const y = currentZ;
+
+  paths[activeDrone].push([x, y, z]);
+  rebuildScene();
+  updateSidePanel();
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCENE OBJECTS
+// ═══════════════════════════════════════════════════════════════════════
+let pathGroup = new THREE.Group();
+scene.add(pathGroup);
+
+function toV3(p) { return new THREE.Vector3(p[0], p[1], p[2]); }
+
+function makeTube(points3, color, radius=0.8) {
+  if (points3.length < 2) return null;
+  const curve = new THREE.CatmullRomCurve3(points3, false, 'chordal');
+  const geo   = new THREE.TubeGeometry(curve, points3.length*6, radius, 6, false);
+  const mat   = new THREE.MeshPhongMaterial({ color, shininess: 60 });
+  return new THREE.Mesh(geo, mat);
+}
+
+function makeSphere(pos, color, r=2) {
+  const geo = new THREE.SphereGeometry(r, 12, 12);
+  const mat = new THREE.MeshPhongMaterial({ color });
+  const m   = new THREE.Mesh(geo, mat);
+  m.position.copy(pos);
+  return m;
+}
+
+function makeLabel(text, pos, color) {
+  // Sprite texte via canvas 2D
+  const cv  = document.createElement("canvas");
+  cv.width  = 128; cv.height = 48;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = `#${color.toString(16).padStart(6,'0')}`;
+  ctx.font = "bold 28px JetBrains Mono, monospace";
+  ctx.fillText(text, 8, 34);
+  const tex  = new THREE.CanvasTexture(cv);
+  const mat  = new THREE.SpriteMaterial({ map: tex, transparent: true });
+  const sp   = new THREE.Sprite(mat);
+  sp.scale.set(14, 6, 1);
+  sp.position.copy(pos).add(new THREE.Vector3(0, 5, 0));
+  return sp;
+}
+
+function rebuildScene() {
+  // Retirer anciens objets de trajectoires
+  while (pathGroup.children.length) pathGroup.remove(pathGroup.children[0]);
+
+  [1, 2, 3].forEach(d => {
+    const pts = paths[d].map(toV3);
+    const col = d === 1 ? C1 : d === 2 ? C2 : C3;
+    if (pts.length >= 2) {
+      const tube = makeTube(pts, col);
+      if (tube) pathGroup.add(tube);
+    }
+    pts.forEach((p, i) => {
+      pathGroup.add(makeSphere(p, col, i===0 ? 3 : 2));
+    });
+    if (pts.length > 0) {
+      pathGroup.add(makeLabel(`D${d}`, pts[0], col));
+    }
+  });
+
+ 
+}
+
+// ── Lighting ─────────────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const dirL = new THREE.DirectionalLight(0xffffff, 0.8);
+dirL.position.set(100, 150, 100);
+scene.add(dirL);
+
+// ── Render loop ──────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+// ═══════════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+function setDrone(n) {
+  activeDrone = n;
+  document.getElementById("btn-d1").className = "btn-t" + (n===1 ? " d1" : "");
+  document.getElementById("btn-d2").className = "btn-t" + (n===2 ? " d2" : "");
+  document.getElementById("btn-d3").className = "btn-t" + (n===3 ? " d3" : "");
+}
+
+function updateZ() {
+  currentZ = parseInt(document.getElementById("z-slider").value);
+  document.getElementById("z-val").textContent = currentZ;
+}
+
+function undoLast() {
+  paths[activeDrone].pop();
+  hitSegs = [];
+  rebuildScene();
+  updateSidePanel();
+}
+
+function clearAll() {
+  paths = {1:[], 2:[], 3:[]};
+  hitSegs = [];
+  document.getElementById("result-card").style.display = "none";
+  rebuildScene();
+  updateSidePanel();
+}
+
+function loadExample() {
+  // 3 trajectoires : D1 et D2 se croisent, D3 est libre
+  paths[1] = [[10,30,10],[30,50,40],[60,60,70],[90,40,90]];
+  paths[2] = [[90,20,10],[60,55,45],[30,65,70],[10,30,90]];
+  paths[3] = [[10,10,80],[50,10,80],[90,10,80]];
+  hitSegs  = [];
+  rebuildScene();
+  updateSidePanel();
+}
+
+function updateSidePanel() {
+  const n1 = paths[1].length, n2 = paths[2].length, n3 = paths[3].length;
+  document.getElementById("pt-count").textContent = `D1: ${n1} — D2: ${n2} — D3: ${n3}`;
+  document.getElementById("btn-analyze").disabled = !(n1>=2 && n2>=2);
+
+  const list = document.getElementById("path-list");
+  const all  = [
+    ...paths[1].map((p,i) => `<span class="d1c">D1[${i}] (${p[0]},${p[1]},${p[2]})</span>`),
+    ...paths[2].map((p,i) => `<span class="d2c">D2[${i}] (${p[0]},${p[1]},${p[2]})</span>`),
+    ...paths[3].map((p,i) => `<span style="color:#10b981;display:block;font-size:.72rem">D3[${i}] (${p[0]},${p[1]},${p[2]})</span>`),
+  ];
+  list.innerHTML = all.length ? all.join("") : `<span>Aucun point posé.</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SERVER HEALTH
+// ═══════════════════════════════════════════════════════════════════════
+async function checkServer() {
+  const dot = document.getElementById("server-dot");
+  const lbl = document.getElementById("server-status");
+  try {
+    const r = await fetch(`${API}/api/health`, { signal: AbortSignal.timeout(2500) });
+    const d = await r.json();
+    dot.className = "ok";
+    lbl.textContent = d.binary
+      ? `Serveur connecté · binaire FHE ✓`
+      : `Serveur connecté · mode simulation`;
+  } catch {
+    dot.className = "error";
+    lbl.textContent = `Serveur non joignable — lancez : python3 server.py`;
+  }
+}
+checkServer();
+setInterval(checkServer, 12000);
+
+// ═══════════════════════════════════════════════════════════════════════
+// ANALYZE
+// ═══════════════════════════════════════════════════════════════════════
+async function analyze() {
+  const btn = document.getElementById("btn-analyze");
+  btn.disabled = true;
+  let elapsed = 0;
+  const timer = setInterval(() => {
+    elapsed++;
+    const m = String(Math.floor(elapsed/60)).padStart(2,'0');
+    const s = String(elapsed%60).padStart(2,'0');
+    btn.innerHTML = `<span class="spin"></span>Calcul FHE… ${m}:${s}`;
+  }, 1000);
+  btn.innerHTML = `<span class="spin"></span>Chiffrement…`;
+
+  try {
+    const res = await fetch(`${API}/api/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path1: paths[1], path2: paths[2], path3: paths[3] }),
+      signal: AbortSignal.timeout(600000)
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(()=>({}));
+      throw new Error(e.error || `HTTP ${res.status}`);
+    }
+    const d = await res.json();
+    showResult(d);
+  } catch(e) {
+    const msg = e.name==="TimeoutError"
+      ? "Timeout (>10 min). Essaie avec moins de waypoints."
+      : (e.message.includes("fetch")||e.message.includes("Failed"))
+        ? "Serveur non joignable.\n→ python3 server.py"
+        : "Erreur : " + e.message;
+    alert(msg);
+  } finally {
+    clearInterval(timer);
+    btn.disabled = false;
+    btn.innerHTML = "Analyser les trajectoires";
+  }
+}
+
+function showResult(d) {
+  hitSegs = d.details || [];
+  rebuildScene();
+
+  // Verdict
+  const v = document.getElementById("verdict");
+  v.className = "verdict " + (d.collision ? "col" : "nocol");
+  v.textContent = d.collision ? "⚠ COLLISION DÉTECTÉE" : "✓ PAS DE COLLISION";
+
+  // Badge mode
+  const b = document.getElementById("mode-badge");
+  b.textContent = d.mode === "fhe_reel" ? "FHE réel" : "métriques estimées";
+  b.className   = d.mode === "fhe_reel" ? "mode-b" : "mode-s";
+
+  // Métriques
+  document.getElementById("m-segs").textContent = d.segments_tested ?? (d.pairs_tested ?? "—");
+  document.getElementById("m-time").textContent = fmtTime(d.total_time_ms ?? d.time_ms);
+  document.getElementById("m-sw").textContent   = (d.scheme_switches ?? "—") + " SS";
+  document.getElementById("m-ct").textContent   = (d.ciphertext_size_kb ?? "—") + " KB";
+
+  // Détails par paire
+  if (d.details && d.details.length > 0) {
+    document.getElementById("col-details").style.display = "block";
+    document.getElementById("col-list").textContent =
+      d.details.map(h => {
+        if (h.pair) return `${h.pair} : collision seg[${h.seg1}]∩seg[${h.seg2}]`;
+        return `D1[${h.seg1}→${h.seg1+1}] ∩ D2[${h.seg2}→${h.seg2+1}]`;
+      }).join("\n");
+  } else {
+    document.getElementById("col-details").style.display = "none";
+  }
+
+  document.getElementById("result-card").style.display = "block";
+  document.getElementById("result-card").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+function animBar(fillId, lblId, pct, fmt) {
+  const fill = document.getElementById(fillId);
+  const lbl  = document.getElementById(lblId);
+  let cur = 0; const step = pct/30;
+  const t = setInterval(()=>{
+    cur = Math.min(cur+step, pct);
+    fill.style.width = cur+"%";
+    lbl.textContent  = fmt(cur);
+    if(cur>=pct) clearInterval(t);
+  }, 20);
+}
+
+function fmtTime(ms) {
+  if (ms>=60000) return (ms/60000).toFixed(1)+" min";
+  if (ms>=1000)  return (ms/1000).toFixed(2)+" s";
+  return ms.toFixed(0)+" ms";
+}
+
+function toggleLog() {
+  const b = document.getElementById("log-box");
+  b.style.display = b.style.display==="none" ? "block" : "none";
+}
+
+// Init
+updateSidePanel();
+</script>
+</body>
+</html>
     #result-card { display:none; }
     .verdict { font-family:var(--mono); font-size:1.3rem; font-weight:600; text-align:center; padding:.8rem; border-radius:10px; margin-bottom:.9rem; }
     .verdict.col  { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
