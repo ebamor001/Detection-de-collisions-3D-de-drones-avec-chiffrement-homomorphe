@@ -24,7 +24,7 @@ add_executable(drone_collision
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    src/main.cpp
+    src/main_centralisée.cpp
 )
 
 
@@ -35,3 +35,41 @@ target_link_libraries(drone_collision
 )
 find_package(OpenFHE REQUIRED)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ─── Test 1 : géométrie en clair (pas de FHE, compile et tourne vite) ─────────
+add_executable(test_geometry_clear
+    src/engine.cpp
+    src/geometry.cpp
+    src/io.cpp
+    tests/test_geometry_clear.cpp
+)
+target_link_libraries(test_geometry_clear
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
+)
+
+# ─── Test 2 : oracle FHE vs clair ─────────────────────────────────────────────
+add_executable(test_fhe_oracle
+    src/engine.cpp
+    src/geometry.cpp
+    src/intersection.cpp
+    src/io.cpp
+    tests/test_fhe_oracle.cpp
+)
+target_link_libraries(test_fhe_oracle
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
+)
+
+# ─── Test 3 : benchmark de scalabilité ────────────────────────────────────────
+add_executable(test_benchmark_scalability
+    src/engine.cpp
+    src/geometry.cpp
+    src/intersection.cpp
+    src/io.cpp
+    tests/test_benchmark_scalability.cpp
+)
+target_link_libraries(test_benchmark_scalability
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
+)
