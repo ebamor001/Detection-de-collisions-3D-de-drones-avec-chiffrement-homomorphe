@@ -129,12 +129,54 @@ drone_collision/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/build
 .PHONY : drone_collision/fast
 
+#=============================================================================
+# Target rules for targets named test_geometry_clear
+
+# Build rule for target.
+test_geometry_clear: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_geometry_clear
+.PHONY : test_geometry_clear
+
+# fast build rule for target.
+test_geometry_clear/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/build
+.PHONY : test_geometry_clear/fast
+
+#=============================================================================
+# Target rules for targets named test_fhe_oracle
+
+# Build rule for target.
+test_fhe_oracle: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_fhe_oracle
+.PHONY : test_fhe_oracle
+
+# fast build rule for target.
+test_fhe_oracle/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/build
+.PHONY : test_fhe_oracle/fast
+
+#=============================================================================
+# Target rules for targets named test_benchmark_scalability
+
+# Build rule for target.
+test_benchmark_scalability: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_benchmark_scalability
+.PHONY : test_benchmark_scalability
+
+# fast build rule for target.
+test_benchmark_scalability/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/build
+.PHONY : test_benchmark_scalability/fast
+
 src/engine.o: src/engine.cpp.o
 .PHONY : src/engine.o
 
 # target to build an object file
 src/engine.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/engine.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/engine.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/engine.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/engine.cpp.o
 .PHONY : src/engine.cpp.o
 
 src/engine.i: src/engine.cpp.i
@@ -143,6 +185,9 @@ src/engine.i: src/engine.cpp.i
 # target to preprocess a source file
 src/engine.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/engine.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/engine.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/engine.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/engine.cpp.i
 .PHONY : src/engine.cpp.i
 
 src/engine.s: src/engine.cpp.s
@@ -151,6 +196,9 @@ src/engine.s: src/engine.cpp.s
 # target to generate assembly for a file
 src/engine.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/engine.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/engine.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/engine.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/engine.cpp.s
 .PHONY : src/engine.cpp.s
 
 src/geometry.o: src/geometry.cpp.o
@@ -159,6 +207,9 @@ src/geometry.o: src/geometry.cpp.o
 # target to build an object file
 src/geometry.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/geometry.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/geometry.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/geometry.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/geometry.cpp.o
 .PHONY : src/geometry.cpp.o
 
 src/geometry.i: src/geometry.cpp.i
@@ -167,6 +218,9 @@ src/geometry.i: src/geometry.cpp.i
 # target to preprocess a source file
 src/geometry.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/geometry.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/geometry.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/geometry.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/geometry.cpp.i
 .PHONY : src/geometry.cpp.i
 
 src/geometry.s: src/geometry.cpp.s
@@ -175,6 +229,9 @@ src/geometry.s: src/geometry.cpp.s
 # target to generate assembly for a file
 src/geometry.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/geometry.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/geometry.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/geometry.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/geometry.cpp.s
 .PHONY : src/geometry.cpp.s
 
 src/intersection.o: src/intersection.cpp.o
@@ -183,6 +240,8 @@ src/intersection.o: src/intersection.cpp.o
 # target to build an object file
 src/intersection.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/intersection.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/intersection.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/intersection.cpp.o
 .PHONY : src/intersection.cpp.o
 
 src/intersection.i: src/intersection.cpp.i
@@ -191,6 +250,8 @@ src/intersection.i: src/intersection.cpp.i
 # target to preprocess a source file
 src/intersection.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/intersection.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/intersection.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/intersection.cpp.i
 .PHONY : src/intersection.cpp.i
 
 src/intersection.s: src/intersection.cpp.s
@@ -199,6 +260,8 @@ src/intersection.s: src/intersection.cpp.s
 # target to generate assembly for a file
 src/intersection.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/intersection.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/intersection.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/intersection.cpp.s
 .PHONY : src/intersection.cpp.s
 
 src/io.o: src/io.cpp.o
@@ -207,6 +270,9 @@ src/io.o: src/io.cpp.o
 # target to build an object file
 src/io.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/io.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/io.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/io.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/io.cpp.o
 .PHONY : src/io.cpp.o
 
 src/io.i: src/io.cpp.i
@@ -215,6 +281,9 @@ src/io.i: src/io.cpp.i
 # target to preprocess a source file
 src/io.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/io.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/io.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/io.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/io.cpp.i
 .PHONY : src/io.cpp.i
 
 src/io.s: src/io.cpp.s
@@ -223,31 +292,106 @@ src/io.s: src/io.cpp.s
 # target to generate assembly for a file
 src/io.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/io.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/src/io.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/src/io.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/src/io.cpp.s
 .PHONY : src/io.cpp.s
 
-src/main.o: src/main.cpp.o
-.PHONY : src/main.o
+src/main_centralisée.o: src/main_centralisée.cpp.o
+.PHONY : src/main_centralisée.o
 
 # target to build an object file
-src/main.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/main.cpp.o
-.PHONY : src/main.cpp.o
+src/main_centralisée.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/main_centralisée.cpp.o
+.PHONY : src/main_centralisée.cpp.o
 
-src/main.i: src/main.cpp.i
-.PHONY : src/main.i
+src/main_centralisée.i: src/main_centralisée.cpp.i
+.PHONY : src/main_centralisée.i
 
 # target to preprocess a source file
-src/main.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/main.cpp.i
-.PHONY : src/main.cpp.i
+src/main_centralisée.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/main_centralisée.cpp.i
+.PHONY : src/main_centralisée.cpp.i
 
-src/main.s: src/main.cpp.s
-.PHONY : src/main.s
+src/main_centralisée.s: src/main_centralisée.cpp.s
+.PHONY : src/main_centralisée.s
 
 # target to generate assembly for a file
-src/main.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/main.cpp.s
-.PHONY : src/main.cpp.s
+src/main_centralisée.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/drone_collision.dir/build.make CMakeFiles/drone_collision.dir/src/main_centralisée.cpp.s
+.PHONY : src/main_centralisée.cpp.s
+
+tests/test_benchmark_scalability.o: tests/test_benchmark_scalability.cpp.o
+.PHONY : tests/test_benchmark_scalability.o
+
+# target to build an object file
+tests/test_benchmark_scalability.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/tests/test_benchmark_scalability.cpp.o
+.PHONY : tests/test_benchmark_scalability.cpp.o
+
+tests/test_benchmark_scalability.i: tests/test_benchmark_scalability.cpp.i
+.PHONY : tests/test_benchmark_scalability.i
+
+# target to preprocess a source file
+tests/test_benchmark_scalability.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/tests/test_benchmark_scalability.cpp.i
+.PHONY : tests/test_benchmark_scalability.cpp.i
+
+tests/test_benchmark_scalability.s: tests/test_benchmark_scalability.cpp.s
+.PHONY : tests/test_benchmark_scalability.s
+
+# target to generate assembly for a file
+tests/test_benchmark_scalability.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_benchmark_scalability.dir/build.make CMakeFiles/test_benchmark_scalability.dir/tests/test_benchmark_scalability.cpp.s
+.PHONY : tests/test_benchmark_scalability.cpp.s
+
+tests/test_fhe_oracle.o: tests/test_fhe_oracle.cpp.o
+.PHONY : tests/test_fhe_oracle.o
+
+# target to build an object file
+tests/test_fhe_oracle.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/tests/test_fhe_oracle.cpp.o
+.PHONY : tests/test_fhe_oracle.cpp.o
+
+tests/test_fhe_oracle.i: tests/test_fhe_oracle.cpp.i
+.PHONY : tests/test_fhe_oracle.i
+
+# target to preprocess a source file
+tests/test_fhe_oracle.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/tests/test_fhe_oracle.cpp.i
+.PHONY : tests/test_fhe_oracle.cpp.i
+
+tests/test_fhe_oracle.s: tests/test_fhe_oracle.cpp.s
+.PHONY : tests/test_fhe_oracle.s
+
+# target to generate assembly for a file
+tests/test_fhe_oracle.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_fhe_oracle.dir/build.make CMakeFiles/test_fhe_oracle.dir/tests/test_fhe_oracle.cpp.s
+.PHONY : tests/test_fhe_oracle.cpp.s
+
+tests/test_geometry_clear.o: tests/test_geometry_clear.cpp.o
+.PHONY : tests/test_geometry_clear.o
+
+# target to build an object file
+tests/test_geometry_clear.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/tests/test_geometry_clear.cpp.o
+.PHONY : tests/test_geometry_clear.cpp.o
+
+tests/test_geometry_clear.i: tests/test_geometry_clear.cpp.i
+.PHONY : tests/test_geometry_clear.i
+
+# target to preprocess a source file
+tests/test_geometry_clear.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/tests/test_geometry_clear.cpp.i
+.PHONY : tests/test_geometry_clear.cpp.i
+
+tests/test_geometry_clear.s: tests/test_geometry_clear.cpp.s
+.PHONY : tests/test_geometry_clear.s
+
+# target to generate assembly for a file
+tests/test_geometry_clear.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_geometry_clear.dir/build.make CMakeFiles/test_geometry_clear.dir/tests/test_geometry_clear.cpp.s
+.PHONY : tests/test_geometry_clear.cpp.s
 
 # Help Target
 help:
@@ -258,6 +402,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... drone_collision"
+	@echo "... test_benchmark_scalability"
+	@echo "... test_fhe_oracle"
+	@echo "... test_geometry_clear"
 	@echo "... src/engine.o"
 	@echo "... src/engine.i"
 	@echo "... src/engine.s"
@@ -270,9 +417,18 @@ help:
 	@echo "... src/io.o"
 	@echo "... src/io.i"
 	@echo "... src/io.s"
-	@echo "... src/main.o"
-	@echo "... src/main.i"
-	@echo "... src/main.s"
+	@echo "... src/main_centralisée.o"
+	@echo "... src/main_centralisée.i"
+	@echo "... src/main_centralisée.s"
+	@echo "... tests/test_benchmark_scalability.o"
+	@echo "... tests/test_benchmark_scalability.i"
+	@echo "... tests/test_benchmark_scalability.s"
+	@echo "... tests/test_fhe_oracle.o"
+	@echo "... tests/test_fhe_oracle.i"
+	@echo "... tests/test_fhe_oracle.s"
+	@echo "... tests/test_geometry_clear.o"
+	@echo "... tests/test_geometry_clear.i"
+	@echo "... tests/test_geometry_clear.s"
 .PHONY : help
 
 

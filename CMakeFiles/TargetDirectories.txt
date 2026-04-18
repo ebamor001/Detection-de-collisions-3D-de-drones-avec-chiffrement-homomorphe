@@ -1,0 +1,6 @@
+/home/ghada-hajji/Téléchargements/codeprojet/Detection-de-collisions-3D-de-drones-avec-chiffrement-homomorphe-batching/CMakeFiles/drone_collision.dir
+/home/ghada-hajji/Téléchargements/codeprojet/Detection-de-collisions-3D-de-drones-avec-chiffrement-homomorphe-batching/CMakeFiles/test_geometry_clear.dir
+/home/ghada-hajji/Téléchargements/codeprojet/Detection-de-collisions-3D-de-drones-avec-chiffrement-homomorphe-batching/CMakeFiles/test_fhe_oracle.dir
+/home/ghada-hajji/Téléchargements/codeprojet/Detection-de-collisions-3D-de-drones-avec-chiffrement-homomorphe-batching/CMakeFiles/test_benchmark_scalability.dir
+/home/ghada-hajji/Téléchargements/codeprojet/Detection-de-collisions-3D-de-drones-avec-chiffrement-homomorphe-batching/CMakeFiles/edit_cache.dir
+/home/ghada-hajji/Téléchargements/codeprojet/Detection-de-collisions-3D-de-drones-avec-chiffrement-homomorphe-batching/CMakeFiles/rebuild_cache.dir
