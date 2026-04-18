@@ -24,7 +24,8 @@ add_executable(drone_collision
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    src/main_centralisée.cpp
+    src/main_centralise.cpp
+    src/main.cpp
 )
 
 
