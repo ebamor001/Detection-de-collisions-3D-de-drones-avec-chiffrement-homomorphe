@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Drone HE — Suivi temps réel</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Courier New', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      color: #0ea5e9;
+      margin-bottom: 6px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 20px;
+    }
+
+    /* ── Alerte collision ── */
+    #alert {
+      display: none;
+      background: #ef4444;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: bold;
+      padding: 12px 24px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      text-align: center;
+      animation: pulse 0.8s ease-in-out infinite alternate;
+      width: 100%;
+      max-width: 700px;
+    }
+    @keyframes pulse {
+      from { opacity: 1; transform: scale(1); }
+      to   { opacity: 0.8; transform: scale(1.02); }
+    }
+
+    /* ── Carte ── */
+    .map-container {
+      position: relative;
+      width: 700px;
+      height: 500px;
+    }
+
+    canvas {
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      background: #0f172a;
+    }
+
+    /* ── Panneau infos ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+      width: 700px;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .card-title {
+      font-size: 0.7rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .card-val {
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    .alice { color: #0ea5e9; }
+    .bob   { color: #a78bfa; }
+    .ok    { color: #10b981; }
+    .warn  { color: #ef4444; }
+    .muted { color: #94a3b8; font-size: 0.85rem; }
+
+    /* ── Status FHE ── */
+    #fhe-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+    #fhe-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+    #fhe-dot.running { background: #f59e0b; animation: spin 1s linear infinite; }
+    #fhe-dot.done    { background: #10b981; }
+    @keyframes spin {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.3; }
+      100% { opacity: 1; }
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: #1e293b;
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #0ea5e9;
+      transition: width 0.5s ease;
+    }
+    .progress-fill.bob-fill { background: #a78bfa; }
+
+    footer {
+      margin-top: 20px;
+      font-size: 0.7rem;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Drone HE — Suivi temps réel</h1>
+<p class="subtitle">Détection de collision chiffrée (FHE) · Alice &amp; Bob · 15 segments</p>
+
+<!-- Alerte collision -->
+<div id="alert">⚠ COLLISION DÉTECTÉE — CHANGER D'ALTITUDE</div>
+
+<!-- Carte canvas -->
+<div class="map-container">
+  <canvas id="map" width="700" height="500"></canvas>
+</div>
+
+<!-- Infos -->
+<div class="info-grid">
+  <div class="card">
+    <div class="card-title">Alice (Drone 1)</div>
+    <div class="card-val alice" id="alice-pos">—</div>
+    <div class="muted" id="alice-seg">segment 0/15</div>
+    <div class="progress-bar"><div class="progress-fill" id="alice-bar" style="width:0%"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Bob (Drone 2)</div>
+    <div class="card-val bob" id="bob-pos">—</div>
+    <div class="muted" id="bob-seg">segment 0/15</div>
+    <div class="progress-bar"><div class="progress-fill bob-fill" id="bob-bar" style="width:0%"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Dernier calcul FHE</div>
+    <div class="card-val ok" id="result-val">En attente...</div>
+    <div class="muted" id="fhe-time">—</div>
+    <div id="fhe-status">
+      <div id="fhe-dot"></div>
+      <span id="fhe-label">En attente</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Métriques FHE</div>
+    <div class="muted">Scheme switches : <span id="ss-val" class="alice">—</span></div>
+    <div class="muted" style="margin-top:4px">Temps total : <span id="total-time" class="alice">—</span></div>
+    <div class="muted" style="margin-top:4px">Statut : <span id="sim-status" class="ok">—</span></div>
+  </div>
+</div>
+
+<footer>Mise à jour toutes les 3 secondes · Communication via sockets TCP · OpenFHE CKKS+FHEW</footer>
+
+<script>
+const API = "http://localhost:8765";
+const canvas = document.getElementById("map");
+const ctx    = canvas.getContext("2d");
+
+// Trajectoires complètes pour affichage
+const ALICE_TRAJ = [
+  [0,0,30],[7,7,30],[13,13,30],[20,20,30],[27,27,30],
+  [33,33,30],[40,40,30],[47,47,30],[53,53,30],[60,60,30],
+  [67,67,30],[73,73,30],[80,80,30],[87,87,30],[93,93,30],[100,100,30]
+];
+const BOB_TRAJ = [
+  [100,0,30],[93,7,30],[87,13,30],[80,20,30],[73,27,30],
+  [67,33,30],[60,40,30],[53,47,30],[47,53,30],[40,60,30],
+  [33,67,30],[27,73,30],[20,80,30],[13,87,30],[7,93,30],[0,100,30]
+];
+
+// Convertir coordonnées [0,100] → canvas [20,680] x [20,480]
+function toCanvas(x, y) {
+  return [20 + x * 6.6, 20 + y * 4.6];
+}
+
+function drawMap(state) {
+  ctx.clearRect(0, 0, 700, 500);
+
+  // Fond grille
+  ctx.strokeStyle = "#1e293b";
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 10; i++) {
+    const x = 20 + i * 66;
+    const y = 20 + i * 46;
+    ctx.beginPath(); ctx.moveTo(x, 20); ctx.lineTo(x, 480); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(680, y); ctx.stroke();
+  }
+
+  // Trajectoire complète Alice (gris foncé)
+  ctx.strokeStyle = "#1e3a5f";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ALICE_TRAJ.forEach(([x,y], i) => {
+    const [cx, cy] = toCanvas(x, y);
+    i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
+  });
+  ctx.stroke();
+
+  // Trajectoire complète Bob (gris foncé)
+  ctx.strokeStyle = "#2d1b69";
+  ctx.beginPath();
+  BOB_TRAJ.forEach(([x,y], i) => {
+    const [cx, cy] = toCanvas(x, y);
+    i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const segA = state.alice?.seg ?? 0;
+  const segB = state.bob?.seg   ?? 0;
+
+  // Chemin parcouru Alice (bleu vif)
+  if (segA > 0) {
+    ctx.strokeStyle = "#0ea5e9";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i <= segA && i < ALICE_TRAJ.length; i++) {
+      const [cx, cy] = toCanvas(ALICE_TRAJ[i][0], ALICE_TRAJ[i][1]);
+      i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+  }
+
+  // Chemin parcouru Bob (violet vif)
+  if (segB > 0) {
+    ctx.strokeStyle = "#a78bfa";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    for (let i = 0; i <= segB && i < BOB_TRAJ.length; i++) {
+      const [cx, cy] = toCanvas(BOB_TRAJ[i][0], BOB_TRAJ[i][1]);
+      i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
+  }
+
+  // Drone Alice (cercle bleu)
+  const posA = state.alice?.pos ?? ALICE_TRAJ[0];
+  const [ax, ay] = toCanvas(posA[0], posA[1]);
+  ctx.fillStyle = state.collision ? "#ef4444" : "#0ea5e9";
+  ctx.beginPath();
+  ctx.arc(ax, ay, state.collision ? 10 : 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "white";
+  ctx.font = "bold 9px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("A", ax, ay + 3);
+
+  // Drone Bob (cercle violet)
+  const posB = state.bob?.pos ?? BOB_TRAJ[0];
+  const [bx, by] = toCanvas(posB[0], posB[1]);
+  ctx.fillStyle = state.collision ? "#ef4444" : "#a78bfa";
+  ctx.beginPath();
+  ctx.arc(bx, by, state.collision ? 10 : 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "white";
+  ctx.font = "bold 9px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("B", bx, by + 3);
+
+  // Panneau collision sur la carte
+  if (state.collision) {
+    const mx = (ax + bx) / 2;
+    const my = (ay + by) / 2 - 30;
+    ctx.fillStyle = "rgba(239,68,68,0.9)";
+    ctx.beginPath();
+    ctx.roundRect(mx - 80, my - 14, 160, 28, 6);
+    ctx.fill();
+    ctx.fillStyle = "white";
+    ctx.font = "bold 11px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("⚠ COLLISION", mx, my + 5);
+  }
+
+  // Légende
+  ctx.font = "11px monospace";
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#0ea5e9";
+  ctx.fillRect(20, 460, 12, 4);
+  ctx.fillText("Alice", 36, 466);
+  ctx.fillStyle = "#a78bfa";
+  ctx.fillRect(90, 460, 12, 4);
+  ctx.fillText("Bob", 106, 466);
+}
+
+function updateUI(state) {
+  // Carte
+  drawMap(state);
+
+  // Alerte
+  const alert = document.getElementById("alert");
+  if (state.collision) {
+    alert.style.display = "block";
+    alert.textContent = state.collision_msg || "⚠ COLLISION DÉTECTÉE — CHANGER D'ALTITUDE";
+  } else {
+    alert.style.display = "none";
+  }
+
+  // Positions
+  const posA = state.alice?.pos ?? [0,0,0];
+  const posB = state.bob?.pos   ?? [0,0,0];
+  document.getElementById("alice-pos").textContent =
+    `(${posA[0]}, ${posA[1]}, ${posA[2]})`;
+  document.getElementById("bob-pos").textContent =
+    `(${posB[0]}, ${posB[1]}, ${posB[2]})`;
+
+  // Segments
+  const segA  = state.alice?.seg   ?? 0;
+  const segB  = state.bob?.seg     ?? 0;
+  const totA  = state.alice?.total ?? 15;
+  const totB  = state.bob?.total   ?? 15;
+  document.getElementById("alice-seg").textContent = `segment ${segA}/${totA}`;
+  document.getElementById("bob-seg").textContent   = `segment ${segB}/${totB}`;
+  document.getElementById("alice-bar").style.width = `${(segA/totA)*100}%`;
+  document.getElementById("bob-bar").style.width   = `${(segB/totB)*100}%`;
+
+  // Résultat
+  const rv = document.getElementById("result-val");
+  if (state.collision) {
+    rv.textContent = "⚠ COLLISION";
+    rv.className   = "card-val warn";
+  } else {
+    rv.textContent = "✓ PAS DE COLLISION";
+    rv.className   = "card-val ok";
+  }
+  document.getElementById("fhe-time").textContent =
+    state.fhe_time_ms ? `Durée : ${(state.fhe_time_ms/1000).toFixed(1)} s` : "—";
+
+  // Statut FHE
+  const dot   = document.getElementById("fhe-dot");
+  const label = document.getElementById("fhe-label");
+  if (state.fhe_running) {
+    dot.className   = "running";
+    label.textContent = "Calcul FHE en cours...";
+  } else {
+    dot.className   = "done";
+    label.textContent = "Calcul terminé";
+  }
+
+  // Métriques
+  document.getElementById("ss-val").textContent    = state.scheme_switches ?? "—";
+  document.getElementById("total-time").textContent =
+    state.fhe_time_ms ? `${(state.fhe_time_ms/1000).toFixed(1)} s` : "—";
+  document.getElementById("sim-status").textContent =
+    state.finished ? "Simulation terminée" : `Seg Alice: ${segA} | Bob: ${segB}`;
+}
+
+// Polling toutes les 3 secondes
+async function poll() {
+  try {
+    const r = await fetch(`${API}/api/drone_status`,
+      { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const state = await r.json();
+      updateUI(state);
+    }
+  } catch(e) {
+    console.warn("Serveur non joignable:", e.message);
+  }
+}
+
+// Dessin initial
+drawMap({alice:{pos:[0,50,30],seg:0,total:15}, bob:{pos:[100,0,30],seg:0,total:15},
+         collision:false});
+
+poll();
+setInterval(poll, 3000);
+</script>
+</body>
+</html>

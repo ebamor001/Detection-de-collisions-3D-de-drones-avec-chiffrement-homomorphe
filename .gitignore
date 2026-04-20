@@ -1,0 +1,10 @@
+build/
+CMakeFiles/
+CMakeCache.txt
+
+.vscode/
+
+*.bin
+
+__pycache__/
+*.pyc

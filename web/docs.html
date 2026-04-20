@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drone HE — Docs</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background:#f6f7fb; }
+    .topbar { background:#111827; }
+    .page-header { background:#fff; border-bottom:1px solid #e5e7eb; }
+    .chip{display:inline-block;padding:.35rem .6rem;border-radius:999px;font-size:.85rem;background:#eef2ff;color:#3730a3;border:1px solid #e0e7ff;}
+    .card-soft{border:1px solid #e5e7eb;box-shadow:0 8px 22px rgba(17,24,39,0.06);border-radius:14px;}
+    .muted{color:#6b7280;}
+    .footer{background:#111827;color:#e5e7eb;}
+    code{background:#f3f4f6;padding:.1rem .35rem;border-radius:.4rem;}
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark topbar">
+  <div class="container">
+    <a class="navbar-brand fw-semibold" href="index.html">Drone HE</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div id="nav" class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto gap-lg-2">
+        <li class="nav-item"><a class="nav-link" href="index.html">Projet</a></li>
+        <li class="nav-item"><a class="nav-link active" href="docs.html">Docs</a></li>
+        <li class="nav-item"><a class="nav-link" href="demo.html">Démo</a></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<header class="page-header py-5">
+  <div class="container">
+    <h1 class="fw-bold mb-2">Documentation</h1>
+    <p class="lead muted mb-0">Comprendre la méthode : CKKS pour la géométrie, comparator TFHE-style pour décider “oui/non”.</p>
+  </div>
+</header>
+
+<section class="py-5">
+  <div class="container">
+
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="card card-soft h-100">
+          <div class="card-body">
+            <div class="chip mb-2">Motivation</div>
+            <h5 class="fw-bold">Pourquoi la confidentialité ?</h5>
+            <p class="muted mb-0">
+              Les trajectoires peuvent révéler des informations sensibles (missions, zones, habitudes, itinéraires).
+              On veut donc calculer un indicateur de collision sans divulguer les chemins.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card card-soft h-100">
+          <div class="card-body">
+            <div class="chip mb-2">Objectif</div>
+            <h5 class="fw-bold">Ce qui est révélé</h5>
+            <p class="muted mb-0">
+              Uniquement un résultat minimal : <strong>collision</strong> / <strong>pas collision</strong>.
+              Aucun point de trajectoire n’est révélé.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-5">
+      <h2 class="fw-bold mb-3">CKKS (calculs réels)</h2>
+      <p class="muted">
+        CKKS permet d’effectuer des opérations (additions, multiplications) sur des valeurs réelles chiffrées.
+        C’est adapté aux calculs géométriques (distances, projections, produits scalaires), avec une précision contrôlée.
+      </p>
+    </div>
+
+    <div class="mt-4">
+      <h2 class="fw-bold mb-3">Comparator TFHE-style (booléens)</h2>
+      <p class="muted">
+        Pour décider “collision ?”, il faut souvent une comparaison ou un signe (ex: <code>x &gt; 0</code>).
+        Les comparaisons étant coûteuses en HE approximatif, on utilise un comparator binaire de style TFHE
+        (souvent via scheme switching) pour obtenir un booléen.
+      </p>
+    </div>
+
+    <div class="mt-4">
+      <h2 class="fw-bold mb-3">Protocole simplifié</h2>
+      <div class="row g-4">
+        <div class="col-md-3">
+          <div class="card card-soft h-100"><div class="card-body">
+            <div class="chip mb-2">1</div>
+            <h6 class="fw-bold">KeyGen</h6>
+            <p class="muted mb-0">Bob génère les clés (CKKS + éléments comparator).</p>
+          </div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card card-soft h-100"><div class="card-body">
+            <div class="chip mb-2">2</div>
+            <h6 class="fw-bold">Chiffrement</h6>
+            <p class="muted mb-0">Les trajectoires sont encodées/chiffrées.</p>
+          </div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card card-soft h-100"><div class="card-body">
+            <div class="chip mb-2">3</div>
+            <h6 class="fw-bold">Calcul</h6>
+            <p class="muted mb-0">Intersection calculée sur données chiffrées.</p>
+          </div></div>
+        </div>
+        <div class="col-md-3">
+          <div class="card card-soft h-100"><div class="card-body">
+            <div class="chip mb-2">4</div>
+            <h6 class="fw-bold">Révélation</h6>
+            <p class="muted mb-0">Seul le booléen final est révélé à Bob.</p>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-5">
+      <h2 class="fw-bold mb-3">Limites / points d’attention</h2>
+      <ul class="muted">
+        <li>Coût supérieur au calcul en clair (temps, mémoire, taille des chiffrés).</li>
+        <li>CKKS est approximatif : gestion des échelles et de la précision.</li>
+        <li>Comparaisons coûteuses → comparator dédié.</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+<footer class="footer text-center py-4">
+  Documentation — Drone HE
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
