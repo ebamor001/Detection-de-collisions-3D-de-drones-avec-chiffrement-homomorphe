@@ -35,7 +35,12 @@ BOB_TRAJ = [
 
 # ── Helpers socket ────────────────────────────────────────────────────────────
 def send_data(s, data):
-    s.sendall(struct.pack(">I", len(data)) + data)
+    # Envoyer la taille
+    s.sendall(struct.pack(">I", len(data)))
+    # Envoyer par chunks de 64KB pour eviter le buffer overflow
+    chunk = 65536
+    for i in range(0, len(data), chunk):
+        s.sendall(data[i:i+chunk])
 
 def recv_data(s):
     n = struct.unpack(">I", _exact(s, 4))[0]
@@ -139,12 +144,10 @@ def main():
         state["collision_msg"]= ""
         write_state(state)
 
-        # Segment courant d'Alice
-        seg_alice = [ALICE_TRAJ[seg-1], ALICE_TRAJ[seg]]
-
-        # ── Chiffrer le segment d'Alice avec SA cle publique ──────────────────
+        # ── Chiffrer le segment d'Alice (6 ciphertexts, 1 coord par ct) ──────
         f_alice_path = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False).name
-        f_alice_ct   = tempfile.NamedTemporaryFile(suffix='_ct_alice.bin', delete=False).name
+        f_alice_ct   = tempfile.NamedTemporaryFile(suffix='_ct_alice', delete=False).name
+        seg_alice = [ALICE_TRAJ[seg-1], ALICE_TRAJ[seg]]
         with open(f_alice_path, 'w') as f:
             f.write(pts_to_str(seg_alice) + "\n")
 
@@ -152,44 +155,46 @@ def main():
              "--ctx", ctx_file, "--pk", pk_file,
              "--path", f_alice_path, "--out", f_alice_ct])
 
-        alice_ct_data = read_file(f_alice_ct)
-        print(f"[Alice] Ciphertext Alice : {len(alice_ct_data)/1024:.1f} KB")
+        # Lire les 6 fichiers generes
+        suffixes = ["_p1x","_p1y","_p1z","_q1x","_q1y","_q1z"]
+        alice_cts = {}
+        for s in suffixes:
+            fname = f_alice_ct + s + ".bin"
+            alice_cts[s] = read_file(fname)
+        print(f"[Alice] 6 ciphertexts generes ({len(alice_cts['_p1x'])/1024:.1f} KB chacun)")
 
-        # ── Envoyer le numero de segment a Bob ────────────────────────────────
+        # Sauvegarder le ciphertext du segment 1 pour les scripts de demo securite
+        if seg == 1:
+            import shutil
+            demo_dir = os.path.dirname(os.path.abspath(__file__))
+            for s in suffixes:
+                shutil.copy(f_alice_ct + s + ".bin",
+                            os.path.join(demo_dir, "demo_ct_alice" + s + ".bin"))
+            write_file(os.path.join(demo_dir, "demo_ctx.bin"),  ctx_data)
+            write_file(os.path.join(demo_dir, "demo_pk.bin"),   pk_data)
+            write_file(os.path.join(demo_dir, "demo_emk.bin"),  emk_data)
+            write_file(os.path.join(demo_dir, "demo_esk.bin"),  esk_data)
+            # Garder aussi demo_ct_alice.bin pour attacker.py
+            shutil.copy(f_alice_ct + "_p1x.bin",
+                        os.path.join(demo_dir, "demo_ct_alice.bin"))
+            print("[Alice] Ciphertexts sauvegardes -> demo_ct_alice*.bin")
+
+        # ── Envoyer signal + 6 ciphertexts a Bob ─────────────────────────────
         send_data(conn, str(seg).encode())
+        for s in suffixes:
+            send_data(conn, alice_cts[s])
+        print(f"[Alice] 6 ct_alice envoyes a Bob")
 
-        # ── Recevoir le ciphertext de Bob (chiffre avec la cle d'Alice) ───────
-        bob_ct_data = recv_data(conn)
-        f_bob_ct = tempfile.NamedTemporaryFile(suffix='_ct_bob.bin', delete=False).name
-        write_file(f_bob_ct, bob_ct_data)
-        print(f"[Alice] Ciphertext Bob recu : {len(bob_ct_data)/1024:.1f} KB")
+        # ── Recevoir UNIQUEMENT le resultat de Bob ────────────────────────────
+        result_data = recv_data(conn)
+        result    = json.loads(result_data.decode())
+        collision = result.get("collision", False)
+        ss        = result.get("scheme_switches", 0)
+        ms        = result.get("time_ms", 0)
+        state["bob"]["pos"] = result.get("pos", list(BOB_TRAJ[seg]))
+        state["bob"]["seg"] = result.get("seg", seg)
 
-        # Mettre a jour position de Bob (envoyee par Bob)
-        bob_pos_data = recv_data(conn)
-        bob_pos = json.loads(bob_pos_data.decode())
-        state["bob"]["pos"] = bob_pos["pos"]
-        state["bob"]["seg"] = bob_pos["seg"]
-
-        # ── Detection FHE ─────────────────────────────────────────────────────
-        print("[Alice] Calcul FHE...")
-        t0 = time.time()
-        out = run([BINARY_PATH, "--mode", "detect",
-                   "--ctx", ctx_file, "--emk", emk_file, "--esk", esk_file,
-                   "--sk",  sk_file,
-                   "--ct1", f_alice_ct, "--ct2", f_bob_ct])
-        ms = (time.time() - t0) * 1000
-
-        # Parser JSON_RESULT
-        collision = False
-        ss = 0
-        for line in out.splitlines():
-            if line.startswith("JSON_RESULT:"):
-                d = json.loads(line[len("JSON_RESULT:"):])
-                collision = d.get("collision", False)
-                ss        = d.get("scheme_switches", 0)
-                break
-
-        print(f"[Alice] Resultat : {'COLLISION' if collision else 'LIBRE'} ({ms:.0f}ms, {ss} SS)")
+        print(f"[Alice] Resultat recu de Bob : {'COLLISION' if collision else 'LIBRE'} ({ms:.0f}ms, {ss} SS)")
 
         # Mettre a jour l'etat
         state["collision"]      = collision
@@ -202,7 +207,10 @@ def main():
         write_state(state)
 
         # Nettoyage fichiers temporaires du segment
-        for f in [f_alice_path, f_alice_ct, f_bob_ct]:
+        for s in suffixes:
+            try: os.unlink(f_alice_ct + s + ".bin")
+            except: pass
+        for f in [f_alice_path]:
             try: os.unlink(f)
             except: pass
 
