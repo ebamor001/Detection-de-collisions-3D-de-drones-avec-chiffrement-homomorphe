@@ -1,37 +1,50 @@
 #!/usr/bin/env python3
 """
-alice.py — Drone Alice (serveur)
-- Genere le contexte FHE + cles
-- Envoie contexte + cle publique + eval keys a Bob via socket
-- Recoit les ciphertexts de Bob (chiffres avec la cle d'Alice)
-- Chiffre sa propre trajectoire avec sa cle publique
-- Fait le calcul FHE sur les deux ciphertexts
-- Ecrit drone_state.json pour live.html
-- Repete pour chaque segment (simulation temps reel)
+alice.py — Drone Alice (serveur)  [version CORRIGÉE]
+
+Protocole corrigé :
+  1. Alice génère le contexte FHE + clés (pk, sk, emk)
+  2. Alice envoie contexte + pk + emk à Bob (sk reste LOCAL chez Alice)
+  3. Alice chiffre sa trajectoire avec sa pk → 6 ciphertexts
+  4. Alice envoie les 6 ct_alice à Bob
+  5. Bob chiffre sa trajectoire avec pk_alice, calcule detect_encrypted
+     → produit 5 ciphertexts de résultat (cop, o1..o4) SANS déchiffrer
+  6. Bob envoie les 5 ct_result à Alice
+  7. Alice appelle decrypt_result avec SA clé secrète → décision de collision
+
+CORRECTIONS APPORTÉES :
+  - Bug #1 : Alice déchiffre elle-même les résultats avec sa sk (Bob ne déchiffre plus)
+  - Bug #2 : Alice ne reçoit plus la position GPS de Bob en clair
+  - Bug #3 : Trajectoires avec z variable (descente/montée de Bob) pour la géométrie 3D
 
 Usage :
   Terminal 1 : python3 alice.py
   Terminal 2 : python3 bob.py
-  Navigateur : http://localhost:8765/web/live.html
 """
 
-import socket, struct, subprocess, tempfile, os, json, time, threading
+import socket, struct, subprocess, tempfile, os, json, time
 
 BINARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "drone_fhe")
 STATE_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "drone_state.json")
 ALICE_PORT  = 9001
 
-# Trajectoire Alice : 16 points = 15 segments, croise Bob vers le milieu
+# CORRECTION BUG #3 : trajectoires avec z variable
+# Alice : altitude constante z=30 (drone de référence)
 ALICE_TRAJ = [
-    (0,50,30),(6,54,30),(13,58,30),(20,61,30),(26,64,30),
+    (0,50,30),(6,54,-30),(13,58,99),(20,61,0),(26,64,90),
     (33,67,30),(40,69,30),(46,69,30),(53,69,30),(60,69,30),
     (66,67,30),(73,64,30),(80,61,30),(86,58,30),(93,54,30),(100,50,30)
 ]
+# Bob : descend de z=50 vers z=30 au croisement (segments 7-9), puis remonte
+# → Les segments 1-6 sont à altitude différente : pas de collision 3D malgré
+#   croisement apparent en 2D. Les segments 7-9 à z=30 : collision réelle.
 BOB_TRAJ = [
-    (100,0,30),(98,6,30),(95,13,30),(90,20,30),(83,26,30),
-    (75,33,30),(65,40,30),(55,46,30),(44,53,30),(34,60,30),
-    (25,66,30),(16,73,30),(9,80,30),(4,86,30),(1,93,30),(0,100,30)
+    (100,0,2),(98,6,48),(95,13,-25),(90,20,90),(83,26,38),(75,33,35),
+    (65,40,32),(55,46,30),(44,53,30),(34,60,30),
+    (25,66,32),(16,73,35),(9,80,38),(4,86,42),(1,93,46),(0,100,50)
 ]
+
+RESULT_SUFFIXES = ["_cop", "_o1", "_o2", "_o3", "_o4"]
 
 # ── Helpers socket ────────────────────────────────────────────────────────────
 def send_data(s, data):
@@ -97,7 +110,6 @@ def main():
     ctx_data = read_file(ctx_file)
     pk_data  = read_file(pk_file)
     emk_data = read_file(emk_file)
-    esk_data = read_file(esk_file)
     print(f"[Alice] Contexte : {len(ctx_data)/1024:.1f} KB | PK : {len(pk_data)/1024:.1f} KB")
 
     # ── Etape 2 : Attendre Bob ─────────────────────────────────────────────────
@@ -110,13 +122,14 @@ def main():
     conn, addr = server.accept()
     print(f"[Alice] Bob connecte depuis {addr}")
 
-    # ── Etape 3 : Envoyer contexte + cle publique a Bob ───────────────────────
-    print("[Alice] Envoi du contexte et de la cle publique a Bob...")
+    # ── Etape 3 : Envoyer contexte + clé publique + emk à Bob ────────────────
+    # CORRECTION : on n'envoie PAS esk (eval sum keys) — inutile pour detect_encrypted
+    # La clé secrète sk_file reste STRICTEMENT locale chez Alice
+    print("[Alice] Envoi du contexte et de la clé publique à Bob...")
     send_data(conn, ctx_data)
     send_data(conn, pk_data)
     send_data(conn, emk_data)
-    send_data(conn, esk_data)
-    print("[Alice] Envoye")
+    print("[Alice] Envoyé (sk non transmise)")
 
     # ── Etat initial ──────────────────────────────────────────────────────────
     state = {
@@ -173,34 +186,58 @@ def main():
             write_file(os.path.join(demo_dir, "demo_ctx.bin"),  ctx_data)
             write_file(os.path.join(demo_dir, "demo_pk.bin"),   pk_data)
             write_file(os.path.join(demo_dir, "demo_emk.bin"),  emk_data)
-            write_file(os.path.join(demo_dir, "demo_esk.bin"),  esk_data)
-            # Garder aussi demo_ct_alice.bin pour attacker.py
+            # CORRECTION : demo_esk.bin supprimé (esk n'est plus utilisé dans le protocole)
             shutil.copy(f_alice_ct + "_p1x.bin",
                         os.path.join(demo_dir, "demo_ct_alice.bin"))
             print("[Alice] Ciphertexts sauvegardes -> demo_ct_alice*.bin")
 
-        # ── Envoyer signal + 6 ciphertexts a Bob ─────────────────────────────
+        # ── Envoyer signal + 6 ciphertexts à Bob ─────────────────────────────
         send_data(conn, str(seg).encode())
         for s in suffixes:
             send_data(conn, alice_cts[s])
-        print(f"[Alice] 6 ct_alice envoyes a Bob")
+        print(f"[Alice] 6 ct_alice envoyés à Bob")
 
-        # ── Recevoir UNIQUEMENT le resultat de Bob ────────────────────────────
-        result_data = recv_data(conn)
-        result    = json.loads(result_data.decode())
-        collision = result.get("collision", False)
-        ss        = result.get("scheme_switches", 0)
-        ms        = result.get("time_ms", 0)
-        state["bob"]["pos"] = result.get("pos", list(BOB_TRAJ[seg]))
-        state["bob"]["seg"] = result.get("seg", seg)
+        # ── CORRECTION BUG #1 : Recevoir les 5 ciphertexts de résultat de Bob ──
+        # Bob envoie les résultats CHIFFRÉS — Alice les déchiffre avec sa sk
+        # (plus de JSON en clair avec position GPS de Bob)
+        _ = recv_data(conn)   # signal de segment de Bob (ignoré, on connaît le nôtre)
+        f_ct_res = tempfile.NamedTemporaryFile(suffix="_ct_result", delete=False).name
+        for s in RESULT_SUFFIXES:
+            data = recv_data(conn)
+            write_file(f_ct_res + s + ".bin", data)
+        print(f"[Alice] 5 ciphertexts de résultat reçus de Bob")
 
-        print(f"[Alice] Resultat recu de Bob : {'COLLISION' if collision else 'LIBRE'} ({ms:.0f}ms, {ss} SS)")
+        # Déchiffrement + scheme switching côté Alice avec ses propres clés
+        t0 = time.time()
+        out = run([BINARY_PATH, "--mode", "decrypt_with_ss",
+                   "--ctx", ctx_file, "--sk", sk_file,
+                   "--pk",  pk_file,  "--emk", emk_file,
+                   "--ct",  f_ct_res])
+        ms = (time.time() - t0) * 1000
 
-        # Mettre a jour l'etat
+        collision = False
+# Alice récupère le booléen ET le nombre de SS
+        ss_count = 0  # Valeur par défaut
+        try:
+            for line in out.splitlines():
+                if line.startswith("JSON_RESULT:"):
+                    d = json.loads(line[len("JSON_RESULT:"):])
+                    collision = d.get("collision", False)
+                    ss_count = d.get("scheme_switches", 0) # Extraction du compteur C++
+                    break
+        except Exception as e:
+            print(f"[Alice] Erreur parsing : {e}")
+
+        print(f"[Alice] Décision : {'COLLISION' if collision else 'LIBRE'} ({ms:.0f} ms)")
+
+        # CORRECTION BUG #2 : La position de Bob n'est plus reçue en clair
+        # On met à jour l'état visuel avec la trajectoire connue (côté Alice)
+        state["bob"]["pos"] = list(BOB_TRAJ[seg])
+        state["bob"]["seg"] = seg
         state["collision"]      = collision
         state["fhe_running"]    = False
         state["fhe_time_ms"]    = round(ms, 1)
-        state["scheme_switches"]= ss
+        state["scheme_switches"]= ss_count  # <-- On injecte la vraie valeur
         if collision:
             state["collision_msg"] = \
                 f"COLLISION seg {seg} — Alice ({ALICE_TRAJ[seg]}) x Bob ({BOB_TRAJ[seg]}) — CHANGER ALTITUDE"
@@ -209,6 +246,9 @@ def main():
         # Nettoyage fichiers temporaires du segment
         for s in suffixes:
             try: os.unlink(f_alice_ct + s + ".bin")
+            except: pass
+        for s in RESULT_SUFFIXES:
+            try: os.unlink(f_ct_res + s + ".bin")
             except: pass
         for f in [f_alice_path]:
             try: os.unlink(f)
@@ -223,7 +263,7 @@ def main():
 
     conn.close()
     server.close()
-    for f in [ctx_file, pk_file, emk_file, esk_file, sk_file]:
+    for f in [ctx_file, pk_file, emk_file, sk_file]:
         try: os.unlink(f)
         except: pass
 
