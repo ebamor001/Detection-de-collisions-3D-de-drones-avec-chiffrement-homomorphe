@@ -256,26 +256,23 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGE(const CiphertextCKKS& a,
 
 CryptoEngine::CiphertextCKKS CryptoEngine::compareGT(const CiphertextCKKS& a,
                                                      const CiphertextCKKS& b) {
-    std::cout << "[CE] enter compareGT\n"; std::cout.flush();
+    static int count = 0;
+    count++;
+    std::cout << "[COUNT] compareGT = " << count << std::endl;
+    if (count > 300) {
+        throw std::runtime_error("Too many comparisons");
+    }
 
     checkSwitchingReady();
 
     auto diff = cc->EvalSub(a, b);
-    std::cout << "[CE] compareGT: diff computed\n"; std::cout.flush();
-
     auto zero = cc->EvalSub(diff, diff);
-    std::cout << "[CE] compareGT: zero computed\n"; std::cout.flush();
 
     uint32_t numSlots = config.switchValues;
     uint32_t padded = 1;
     while (padded < numSlots) padded *= 2;
 
-    std::cout << "[CE] compareGT: numSlots=" << numSlots
-              << " padded=" << padded << "\n"; std::cout.flush();
-
-    std::cout << "[CE] compareGT: before EvalCompareSchemeSwitching\n"; std::cout.flush();
     auto r = cc->EvalCompareSchemeSwitching(zero, diff, padded, padded);
-    std::cout << "[CE] compareGT: after EvalCompareSchemeSwitching\n"; std::cout.flush();
 
     return r;
 }
@@ -372,7 +369,12 @@ CryptoEngine::CiphertextCKKS CryptoEngine::isNearZeroSquared(const CiphertextCKK
 }
 
 CryptoEngine::CiphertextCKKS CryptoEngine::compareGreaterThanZero(const CiphertextCKKS& x) {
-    std::cout << "[CE] enter compareGreaterThanZero\n"; std::cout.flush();
+    static int count = 0;
+    count++;
+    std::cout << "[COUNT] compareGreaterThanZero = " << count << std::endl;
+    if (count > 300) {
+        throw std::runtime_error("Too many comparisons");
+    }
 
     checkSwitchingReady();
 
@@ -385,26 +387,13 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareGreaterThanZero(const Cipherte
         throw std::runtime_error("compareGreaterThanZero: ccLWE null");
     }
 
-    std::cout << "[CE] compareGreaterThanZero: ccLWE OK\n"; std::cout.flush();
-    std::cout << "[CE] compareGreaterThanZero: pLWE_ = " << pLWE_ << "\n"; std::cout.flush();
-
     auto zero = cc->EvalSub(x, x);
-    std::cout << "[CE] compareGreaterThanZero: zero computed\n"; std::cout.flush();
 
     uint32_t numSlots = config.switchValues;
     uint32_t padded = 1;
     while (padded < numSlots) padded *= 2;
 
-    std::cout << "[CE] compareGreaterThanZero: numSlots=" << numSlots
-              << " padded=" << padded << "\n"; std::cout.flush();
-
-    std::cout << "[CE] compareGreaterThanZero: before EvalCompareSchemeSwitching\n";
-    std::cout.flush();
-
     auto r = cc->EvalCompareSchemeSwitching(zero, x, padded, padded);
-
-    std::cout << "[CE] compareGreaterThanZero: after EvalCompareSchemeSwitching\n";
-    std::cout.flush();
 
     return r;
 }
@@ -601,12 +590,15 @@ void CryptoEngine::printParameters() const {
 void CryptoEngine::loadPublicContext(CryptoContextCKKS externalCC,
                                      uint32_t batchSize,
                                      uint32_t switchValues,
-                                     const std::string& btkData) {
+                                     const std::string& btkData,
+                                     const PublicKey<DCRTPoly>& pk) {
     if (!externalCC) {
         throw std::runtime_error("loadPublicContext: external context is null");
     }
 
     cc = externalCC;
+    keys.publicKey = pk;
+    keys.secretKey = nullptr;
     config.batchSize = batchSize;
     config.switchValues = switchValues;
 

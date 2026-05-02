@@ -6,7 +6,6 @@
  *
  * Modes communication Alice/Bob :
  *   ./drone_fhe --mode init    --ctx ctx.bin
- *   ./drone_fhe --mode keygen  --ctx ctx.bin --pk pk_bob.bin --sk sk_bob.bin --emk emk_bob.bin --esk esk_bob.bin
  *   ./drone_fhe --mode encrypt --ctx ctx.bin --pk pk.bin --path traj.txt --out ct.bin
  *   ./drone_fhe --mode detect  --ctx ctx.bin --emk emk.bin --esk esk.bin --ct1 ct1.bin --ct2 ct2.bin --out ct_result.bin
  *   ./drone_fhe --mode decrypt --ctx ctx.bin --sk sk_bob.bin --ct ct_result.bin
@@ -133,65 +132,6 @@ static int modeInit(const std::map<std::string,std::string>& args) {
     std::cout << "  swkfc : " << swkfc_file << "\n";
     return 0;
 }
-// ══════════════════════════════════════════════════════════════════════════════
-// MODE KEYGEN — Bob charge le contexte et genere ses propres cles
-// ══════════════════════════════════════════════════════════════════════════════
-
-static int modeKeygen(const std::map<std::string,std::string>& args) {
-    std::string ctx_file = args.count("--ctx") ? args.at("--ctx") : "ctx.bin";
-    std::string pk_file  = args.count("--pk")  ? args.at("--pk")  : "pk_bob.bin";
-    std::string sk_file  = args.count("--sk")  ? args.at("--sk")  : "sk_bob.bin";
-    std::string emk_file = args.count("--emk") ? args.at("--emk") : "emk_bob.bin";
-    std::string esk_file = args.count("--esk") ? args.at("--esk") : "esk_bob.bin";
-
-    std::cout << "[keygen] Chargement du contexte...\n"; std::cout.flush();
-    auto cc = deserializeContext(readFile(ctx_file));
-
-    std::cout << "[keygen] Generation des cles de Bob...\n"; std::cout.flush();
-    auto bobKeys = cc->KeyGen();
-    std::cout << "[keygen] KeyGen OK\n"; std::cout.flush();
-
-    cc->EvalMultKeyGen(bobKeys.secretKey);
-    std::cout << "[keygen] EvalMultKeyGen OK\n"; std::cout.flush();
-
-    std::vector<int32_t> rotIndices;
-    for (int32_t i = 1; i <= 5; ++i) {
-        rotIndices.push_back(i);
-        rotIndices.push_back(-i);
-    }
-
-    std::cout << "[keygen] Debut EvalRotateKeyGen (" << rotIndices.size() << " indices)\n"; std::cout.flush();
-    cc->EvalRotateKeyGen(bobKeys.secretKey, rotIndices);
-    std::cout << "[keygen] EvalRotateKeyGen OK\n"; std::cout.flush();
-
-    std::cout << "[keygen] Generation des cles de scheme switching...\n"; std::cout.flush();
-
-    SchSwchParams swp;
-    swp.SetSecurityLevelCKKS(HEStd_NotSet);
-    swp.SetSecurityLevelFHEW(TOY);
-    swp.SetCtxtModSizeFHEWLargePrec(23);
-    swp.SetNumSlotsCKKS(64);
-    swp.SetNumValues(64);
-
-    auto lweSKBob = cc->EvalSchemeSwitchingSetup(swp);
-    std::cout << "[keygen] EvalSchemeSwitchingSetup OK\n"; std::cout.flush();
-
-    cc->EvalSchemeSwitchingKeyGen(bobKeys, lweSKBob);
-    std::cout << "[keygen] EvalSchemeSwitchingKeyGen OK\n"; std::cout.flush();
-
-    writeFile(pk_file,  serializePublicKey(bobKeys.publicKey));
-    writeFile(sk_file,  serializeSecretKey(bobKeys.secretKey));
-    writeFile(emk_file, serializeEvalMultKeys(cc));
-    writeFile(esk_file, serializeEvalSumKeys(cc));
-
-    std::cout << "[keygen] OK\n";
-    std::cout << "  pk   : " << pk_file  << "\n";
-    std::cout << "  sk   : " << sk_file  << "\n";
-    std::cout << "  emk  : " << emk_file << "\n";
-    std::cout << "  esk  : " << esk_file << "\n";
-    return 0;
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // MODE ENCRYPT — Chiffre une trajectoire avec la cle publique du destinataire
 // ══════════════════════════════════════════════════════════════════════════════
@@ -362,21 +302,22 @@ static int modeServer(const std::map<std::string,std::string>& args) {
 
             if (role == "alice") {
                 if (cmd == "LOAD_REMOTE") {
-                    if (tokens.size() != 5) {
-                        throw std::runtime_error("Usage: LOAD_REMOTE <ctx> <pk> <emk> <esk>");
+                    if (tokens.size() != 7) {
+                        throw std::runtime_error("Usage: LOAD_REMOTE <ctx> <pk> <emk> <esk> <btk> <swkfc>");
                     }
 
                     auto cc = deserializeContext(readFile(tokens[1]));
                     auto pk = deserializePublicKey(readFile(tokens[2]));
                     deserializeEvalMultKeys(cc, readFile(tokens[3]));
                     deserializeEvalSumKeys(cc, readFile(tokens[4]));
+                    std::string btkData = readFile(tokens[5]);
+
 
                     // Pour débloquer vite : moteur vivant avec scheme switching initialisé localement
-                    engine.initialize();
-                    engine.setupSchemeSwitching();
+                    engine.loadPublicContext(cc, 8, 1, btkData, pk);
+                   
+                    deserializeSwkFC(cc, readFile(tokens[6]));
 
-                    // On garde la clé publique de Bob pour chiffrer vers Bob
-                    engine.loadRemoteContext(cc, pk);
                     loaded = true;
 
                     std::cout << "OK loaded_remote\n";
@@ -408,15 +349,20 @@ static int modeServer(const std::map<std::string,std::string>& args) {
                 }
 
                 if (cmd == "DETECT_PATH") {
-                    if (tokens.size() != 4) {
-                        throw std::runtime_error("Usage: DETECT_PATH <ct1.bin> <ct2.bin> <out_ct.bin>");
+                    if (tokens.size() != 4 && tokens.size() != 5) {
+                        throw std::runtime_error("Usage: DETECT_PATH <ct1.bin> <ct2.bin> <out_ct.bin> [same_altitude=0|1]");
                     }
+
+                    bool sameAltitude = (tokens.size() == 5 && tokens[4] == "1");
 
                     auto ct1 = deserializeCiphertext(readFile(tokens[1]));
                     auto ct2 = deserializeCiphertext(readFile(tokens[2]));
-
+                    std::cout << "[debug] isInitialized=" << engine.isInitialized() << "\n";
+                    std::cout << "[debug] swkFC=" << (engine.getCKKSContext()->GetSwkFC() ? "OK" : "NULL") << "\n";
+                    std::cout << "[debug] same_altitude=" << sameAltitude << "\n";
+                    std::cout.flush();
                     GeometryEngine geo(&engine);
-                    auto ct_result = geo.checkSegmentIntersection3DEncrypted(ct1, ct2);
+                    auto ct_result = geo.checkSegmentIntersection3DEncrypted(ct1, ct2, sameAltitude);
 
                     writeFile(tokens[3], serializeCiphertext(ct_result));
 
@@ -643,7 +589,6 @@ int main(int argc, char* argv[]) {
 
     try {
         if      (mode == "init")     return modeInit(args);
-        else if (mode == "keygen")   return modeKeygen(args);
         else if (mode == "encrypt")  return modeEncrypt(args);
         else if (mode == "detect")   return modeDetect(args);
         else if (mode == "decrypt")  return modeDecrypt(args);

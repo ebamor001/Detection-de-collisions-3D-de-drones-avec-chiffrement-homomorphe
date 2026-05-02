@@ -51,9 +51,10 @@ public:
     void   initialize(const Config& cfg = Config());
     bool   isInitialized()    const { return initialized; }
     void loadPublicContext(CryptoContextCKKS externalCC,
-                       uint32_t batchSize = 64,
-                       uint32_t switchValues = 64,
-                       const std::string& btkData = "");
+                       uint32_t batchSize,
+                       uint32_t switchValues,
+                       const std::string& btkData,
+                       const PublicKey<DCRTPoly>& pk = nullptr);
     void loadRemoteContext(CryptoContextCKKS externalCC,
                        const PublicKey<DCRTPoly>& pk,
                        uint32_t batchSize = 64,

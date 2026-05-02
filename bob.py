@@ -23,13 +23,18 @@ import json
 import time
 
 BINARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "drone_fhe")
-ALICE_HOST = "127.0.0.1"
-ALICE_PORT = 9001
+STATE_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "drone_state.json")
+ALICE_HOST  = "127.0.0.1"
+ALICE_PORT  = 9001
+
+ALICE_TRAJ = [
+    (0, 0, 30),
+    (10, 10, 30)
+]
 
 BOB_TRAJ = [
-    (100, 0, 30), (98, 6, 30), (95, 13, 30), (90, 20, 30), (83, 26, 30),
-    (75, 33, 30), (65, 40, 30), (55, 46, 30), (44, 53, 30), (34, 60, 30),
-    (25, 66, 30), (16, 73, 30), (9, 80, 30), (4, 86, 30), (1, 93, 30), (0, 100, 30)
+    (0, 50, 30),
+    (10, 40, 30)
 ]
 
 def send_data(sock, data):
@@ -68,8 +73,31 @@ def run(cmd, timeout=600):
         raise RuntimeError("Commande echouee")
     return result.stdout
 
+def cpp_send(proc, cmd):
+    print(f"[Bob][C++ CMD] {cmd}", flush=True)
+    proc.stdin.write(cmd + "\n")
+    proc.stdin.flush()
+
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            raise RuntimeError("C++ server stopped unexpectedly")
+
+        line = line.strip()
+        print(f"[Bob][C++ OUT] {line}", flush=True)
+
+        if line.startswith("OK "):
+            return line
+
+        if line.startswith("ERR "):
+            raise RuntimeError(line)
+
 def pts_to_str(pts):
     return "".join(f"({x},{y},{z})" for x, y, z in pts)
+
+def write_state(state):
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
 
 def main():
     print("=" * 55)
@@ -84,6 +112,7 @@ def main():
     btk_bob_file = tempfile.NamedTemporaryFile(suffix="_btk_bob.bin", delete=False).name
     swkfc_bob_file = tempfile.NamedTemporaryFile(suffix="_swkfc_bob.bin", delete=False).name
     sock = None
+    cpp_proc = None
     try:
         print("[Bob] Generation de la session HE complete...")
         run([
@@ -95,9 +124,19 @@ def main():
             "--esk", esk_bob_file,
             "--btk", btk_bob_file,
             "--swkfc", swkfc_bob_file
-
         ])
         print("[Bob] Session HE prete")
+
+        cpp_proc = subprocess.Popen(
+            [BINARY_PATH, "--mode", "server", "--role", "bob"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        cpp_send(cpp_proc, f"LOAD_LOCAL {ctx_file} {pk_bob_file} {sk_bob_file}")
+        print("[Bob] Serveur C++ pret")
 
         print(f"[Bob] Connexion a Alice sur {ALICE_HOST}:{ALICE_PORT}...")
         for attempt in range(15):
@@ -108,6 +147,7 @@ def main():
             except ConnectionRefusedError:
                 print(f"[Bob] Alice pas prete, attente... ({attempt + 1}/15)")
                 time.sleep(2)
+                sock.close()
                 sock = None
 
         if sock is None:
@@ -125,6 +165,16 @@ def main():
         print("[Bob] Artefacts envoyes")
 
         n = len(BOB_TRAJ) - 1
+
+        write_state({
+            "alice": {"pos": list(ALICE_TRAJ[0]), "seg": 0, "total": len(ALICE_TRAJ) - 1},
+            "bob":   {"pos": list(BOB_TRAJ[0]),   "seg": 0, "total": n},
+            "collision": False, "collision_msg": "",
+            "fhe_running": False, "fhe_time_ms": 0, "scheme_switches": 0,
+            "finished": False,
+            "traj_alice": list(ALICE_TRAJ), "traj_bob": list(BOB_TRAJ),
+        })
+
         for seg in range(1, n + 1):
             seg_signal = recv_data(sock).decode()
 
@@ -141,6 +191,15 @@ def main():
             seg_bob = [BOB_TRAJ[seg - 1], BOB_TRAJ[seg]]
             print(f"[Bob] Segment : {seg_bob[0]} -> {seg_bob[1]}")
 
+            write_state({
+                "alice": {"pos": list(ALICE_TRAJ[seg]), "seg": seg, "total": len(ALICE_TRAJ) - 1},
+                "bob":   {"pos": list(BOB_TRAJ[seg]),   "seg": seg, "total": n},
+                "collision": False, "collision_msg": "",
+                "fhe_running": True, "fhe_time_ms": 0, "scheme_switches": 0,
+                "finished": False,
+                "traj_alice": list(ALICE_TRAJ), "traj_bob": list(BOB_TRAJ),
+            })
+
             f_path = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False).name
             ct_bob = tempfile.NamedTemporaryFile(suffix="_ct_bob.bin", delete=False).name
             result_ct_file = tempfile.NamedTemporaryFile(suffix="_ct_result.bin", delete=False).name
@@ -149,14 +208,13 @@ def main():
                 with open(f_path, "w") as f:
                     f.write(pts_to_str(seg_bob) + "\n")
 
+                z_bob = (seg_bob[0][2] + seg_bob[1][2]) / 2.0
+                alt_meta = json.dumps({"z": z_bob}).encode()
+                send_data(sock, alt_meta)
+                print(f"[Bob] Altitude envoyee en clair : z={z_bob}")
+
                 print("[Bob] Chiffrement avec pk_bob...")
-                run([
-                    BINARY_PATH, "--mode", "encrypt",
-                    "--ctx", ctx_file,
-                    "--pk", pk_bob_file,
-                    "--path", f_path,
-                    "--out", ct_bob
-                ])
+                cpp_send(cpp_proc, f"ENCRYPT_PATH {f_path} {ct_bob}")
 
                 ct_bob_data = read_file(ct_bob)
                 print(f"[Bob] Ciphertext : {len(ct_bob_data)/1024:.1f} KB — envoi a Alice...")
@@ -171,22 +229,25 @@ def main():
                 result_ct_data = recv_data(sock)
                 write_file(result_ct_file, result_ct_data)
 
+                fhe_meta = json.loads(recv_data(sock).decode())
+
                 print("[Bob] Dechiffrement du resultat final...")
-                out = run([
-                    BINARY_PATH, "--mode", "decrypt",
-                    "--ctx", ctx_file,
-                    "--sk", sk_bob_file,
-                    "--ct", result_ct_file
-                ])
+                out = cpp_send(cpp_proc, f"DECRYPT_PATH {result_ct_file}")
 
-                collision = False
-                for line in out.splitlines():
-                    if line.startswith("JSON_RESULT:"):
-                        d = json.loads(line[len("JSON_RESULT:"):])
-                        collision = d.get("collision", False)
-                        break
-
+                collision = "collision=1" in out
                 print(f"[Bob] Resultat : {'COLLISION' if collision else 'LIBRE'}")
+
+                write_state({
+                    "alice": {"pos": list(ALICE_TRAJ[seg]), "seg": seg, "total": len(ALICE_TRAJ) - 1},
+                    "bob":   {"pos": list(BOB_TRAJ[seg]),   "seg": seg, "total": n},
+                    "collision": collision,
+                    "collision_msg": "⚠ COLLISION DETECTEE" if collision else "",
+                    "fhe_running": False,
+                    "fhe_time_ms": fhe_meta.get("fhe_time_ms", 0),
+                    "scheme_switches": fhe_meta.get("scheme_switches", 0),
+                    "finished": False,
+                    "traj_alice": list(ALICE_TRAJ), "traj_bob": list(BOB_TRAJ),
+                })
 
             finally:
                 for path in [f_path, ct_bob, result_ct_file]:
@@ -195,9 +256,24 @@ def main():
                     except OSError:
                         pass
 
+        write_state({
+            "alice": {"pos": list(ALICE_TRAJ[-1]), "seg": n, "total": len(ALICE_TRAJ) - 1},
+            "bob":   {"pos": list(BOB_TRAJ[-1]),   "seg": n, "total": n},
+            "collision": False, "collision_msg": "",
+            "fhe_running": False, "fhe_time_ms": 0, "scheme_switches": 0,
+            "finished": True,
+            "traj_alice": list(ALICE_TRAJ), "traj_bob": list(BOB_TRAJ),
+        })
         print("\n[Bob] Simulation terminee.")
 
     finally:
+        if cpp_proc is not None:
+            try:
+                cpp_send(cpp_proc, "QUIT")
+                cpp_proc.wait(timeout=5)
+            except Exception:
+                cpp_proc.kill()
+
         if sock is not None:
             sock.close()
 
