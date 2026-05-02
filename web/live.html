@@ -2,12 +2,12 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Drone HE — Suivi temps réel</title>
+  <title>Drone HE — Suivi 3D temps réel</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0f172a;
-      color: #e2e8f0;
+      background: #ffffff;
+      color: #0f172a;
       font-family: 'Courier New', monospace;
       min-height: 100vh;
       display: flex;
@@ -15,146 +15,127 @@
       align-items: center;
       padding: 20px;
     }
-
     h1 {
       font-size: 1.4rem;
       color: #0ea5e9;
-      margin-bottom: 6px;
-      letter-spacing: 2px;
+      margin-bottom: 4px;
+      letter-spacing: 3px;
       text-transform: uppercase;
     }
-
     .subtitle {
-      font-size: 0.75rem;
-      color: #64748b;
-      margin-bottom: 20px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      margin-bottom: 16px;
+      letter-spacing: 1px;
     }
-
-    /* ── Alerte collision ── */
     #alert {
       display: none;
       background: #ef4444;
       color: white;
-      font-size: 1.1rem;
+      font-size: 1rem;
       font-weight: bold;
-      padding: 12px 24px;
-      border-radius: 8px;
-      margin-bottom: 16px;
+      padding: 10px 24px;
+      border-radius: 6px;
+      margin-bottom: 14px;
       text-align: center;
       animation: pulse 0.8s ease-in-out infinite alternate;
       width: 100%;
-      max-width: 700px;
+      max-width: 760px;
     }
     @keyframes pulse {
       from { opacity: 1; transform: scale(1); }
-      to   { opacity: 0.8; transform: scale(1.02); }
+      to   { opacity: 0.85; transform: scale(1.01); }
     }
-
-    /* ── Carte ── */
-    .map-container {
-      position: relative;
-      width: 700px;
-      height: 500px;
-    }
-
-    canvas {
-      border: 1px solid #1e293b;
+    .scene-wrapper {
+      width: 760px;
+      height: 480px;
+      border: 1px solid #e2e8f0;
       border-radius: 12px;
-      background: #0f172a;
+      overflow: hidden;
+      background: #f8fafc;
+      position: relative;
     }
-
-    /* ── Panneau infos ── */
+    #three-canvas { width: 100%; height: 100%; display: block; }
+    .hint {
+      position: absolute;
+      bottom: 10px;
+      right: 14px;
+      font-size: 0.65rem;
+      color: #94a3b8;
+      pointer-events: none;
+    }
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-top: 16px;
-      width: 700px;
+      gap: 10px;
+      margin-top: 14px;
+      width: 760px;
     }
-
     .card {
-      background: #1e293b;
-      border: 1px solid #334155;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
       border-radius: 8px;
       padding: 12px 16px;
     }
-
     .card-title {
-      font-size: 0.7rem;
-      color: #64748b;
+      font-size: 0.65rem;
+      color: #94a3b8;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
+      letter-spacing: 1.5px;
+      margin-bottom: 7px;
     }
-
-    .card-val {
-      font-size: 1.2rem;
-      font-weight: bold;
-    }
-
-    .alice { color: #0ea5e9; }
-    .bob   { color: #a78bfa; }
-    .ok    { color: #10b981; }
-    .warn  { color: #ef4444; }
-    .muted { color: #94a3b8; font-size: 0.85rem; }
-
-    /* ── Status FHE ── */
-    #fhe-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 12px;
-      font-size: 0.8rem;
-      color: #64748b;
-    }
-    #fhe-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #64748b;
-    }
-    #fhe-dot.running { background: #f59e0b; animation: spin 1s linear infinite; }
-    #fhe-dot.done    { background: #10b981; }
-    @keyframes spin {
-      0%   { opacity: 1; }
-      50%  { opacity: 0.3; }
-      100% { opacity: 1; }
-    }
-
+    .card-val { font-size: 1.15rem; font-weight: bold; }
+    .alice  { color: #0ea5e9; }
+    .bob    { color: #7c3aed; }
+    .ok     { color: #059669; }
+    .warn   { color: #ef4444; }
+    .muted  { color: #64748b; font-size: 0.82rem; margin-top: 3px; }
     .progress-bar {
-      height: 4px;
-      background: #1e293b;
+      height: 3px;
+      background: #e2e8f0;
       border-radius: 2px;
       margin-top: 8px;
       overflow: hidden;
     }
-    .progress-fill {
-      height: 100%;
-      background: #0ea5e9;
-      transition: width 0.5s ease;
+    .progress-fill       { height: 100%; background: #0ea5e9; transition: width 0.5s ease; }
+    .progress-fill.bob-f { background: #7c3aed; }
+    #fhe-status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: #64748b;
     }
-    .progress-fill.bob-fill { background: #a78bfa; }
-
+    #fhe-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #cbd5e1;
+      flex-shrink: 0;
+    }
+    #fhe-dot.running { background: #f59e0b; animation: blink 1s linear infinite; }
+    #fhe-dot.done    { background: #059669; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
     footer {
-      margin-top: 20px;
-      font-size: 0.7rem;
-      color: #334155;
+      margin-top: 16px;
+      font-size: 0.65rem;
+      color: #cbd5e1;
+      letter-spacing: 0.5px;
     }
   </style>
 </head>
 <body>
 
-<h1>Drone HE — Suivi temps réel</h1>
+<h1>Drone HE — Suivi 3D temps réel</h1>
 <p class="subtitle">Détection de collision chiffrée (FHE) · Alice &amp; Bob · 15 segments</p>
 
-<!-- Alerte collision -->
 <div id="alert">⚠ COLLISION DÉTECTÉE — CHANGER D'ALTITUDE</div>
 
-<!-- Carte canvas -->
-<div class="map-container">
-  <canvas id="map" width="700" height="500"></canvas>
+<div class="scene-wrapper">
+  <canvas id="three-canvas"></canvas>
+  <div class="hint">🖱 Clic + glisser pour tourner · Molette pour zoomer</div>
 </div>
 
-<!-- Infos -->
 <div class="info-grid">
   <div class="card">
     <div class="card-title">Alice (Drone 1)</div>
@@ -162,14 +143,12 @@
     <div class="muted" id="alice-seg">segment 0/15</div>
     <div class="progress-bar"><div class="progress-fill" id="alice-bar" style="width:0%"></div></div>
   </div>
-
   <div class="card">
     <div class="card-title">Bob (Drone 2)</div>
     <div class="card-val bob" id="bob-pos">—</div>
     <div class="muted" id="bob-seg">segment 0/15</div>
-    <div class="progress-bar"><div class="progress-fill bob-fill" id="bob-bar" style="width:0%"></div></div>
+    <div class="progress-bar"><div class="progress-fill bob-f" id="bob-bar" style="width:0%"></div></div>
   </div>
-
   <div class="card">
     <div class="card-title">Dernier calcul FHE</div>
     <div class="card-val ok" id="result-val">En attente...</div>
@@ -179,23 +158,18 @@
       <span id="fhe-label">En attente</span>
     </div>
   </div>
-
   <div class="card">
     <div class="card-title">Métriques FHE</div>
     <div class="muted">Scheme switches : <span id="ss-val" class="alice">—</span></div>
-    <div class="muted" style="margin-top:4px">Temps total : <span id="total-time" class="alice">—</span></div>
-    <div class="muted" style="margin-top:4px">Statut : <span id="sim-status" class="ok">—</span></div>
+    <div class="muted">Temps total : <span id="total-time" class="alice">—</span></div>
+    <div class="muted">Statut : <span id="sim-status" class="ok">—</span></div>
   </div>
 </div>
 
-<footer>Mise à jour toutes les 3 secondes · Communication via sockets TCP · OpenFHE CKKS+FHEW</footer>
+<footer>Mise à jour toutes les 3 s · Sockets TCP · OpenFHE CKKS+FHEW · Three.js r128</footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-const API = "http://localhost:8765";
-const canvas = document.getElementById("map");
-const ctx    = canvas.getContext("2d");
-
-// Trajectoires complètes pour affichage
 const ALICE_TRAJ = [
   [0,50,30],[6,54,30],[13,58,30],[20,61,30],[26,64,30],
   [33,67,30],[40,69,30],[46,69,30],[53,69,30],[60,69,30],
@@ -207,201 +181,219 @@ const BOB_TRAJ = [
   [25,66,30],[16,73,30],[9,80,30],[4,86,30],[1,93,30],[0,100,30]
 ];
 
-// Convertir coordonnées [0,100] → canvas [20,680] x [20,480]
-function toCanvas(x, y) {
-  return [20 + x * 6.6, 20 + y * 4.6];
+function toScene(x, y, z) {
+  return new THREE.Vector3(x - 50, z - 30, -(y - 50));
 }
 
-function drawMap(state) {
-  ctx.clearRect(0, 0, 700, 500);
+// ── Renderer ──────────────────────────────────────────────────────────────────
+const canvas  = document.getElementById('three-canvas');
+const wrapper = canvas.parentElement;
+const W = wrapper.clientWidth  || 760;
+const H = wrapper.clientHeight || 480;
 
-  // Fond grille
-  ctx.strokeStyle = "#1e293b";
-  ctx.lineWidth = 0.5;
-  for (let i = 0; i <= 10; i++) {
-    const x = 20 + i * 66;
-    const y = 20 + i * 46;
-    ctx.beginPath(); ctx.moveTo(x, 20); ctx.lineTo(x, 480); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(680, y); ctx.stroke();
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0xf8fafc, 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+dirLight.position.set(50, 80, 50);
+scene.add(dirLight);
+
+// Grille
+scene.add(new THREE.GridHelper(100, 10, 0xdde1e7, 0xe8ecf0));
+
+// Axes
+scene.add(new THREE.AxesHelper(55));
+
+// ── Trajectoires fantômes ─────────────────────────────────────────────────────
+function makeLine(traj, color, opacity) {
+  const pts = traj.map(([x,y,z]) => toScene(x, y, z));
+  const geo  = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat  = new THREE.LineBasicMaterial({ color, opacity, transparent: true });
+  return new THREE.Line(geo, mat);
+}
+scene.add(makeLine(ALICE_TRAJ, 0x0ea5e9, 0.2));
+scene.add(makeLine(BOB_TRAJ,   0x7c3aed, 0.2));
+
+// ── Trainées dynamiques ───────────────────────────────────────────────────────
+function makeTrail(color) {
+  const geo  = new THREE.BufferGeometry();
+  const mat  = new THREE.LineBasicMaterial({ color });
+  const line = new THREE.Line(geo, mat);
+  scene.add(line);
+  return line;
+}
+const aliceTrail = makeTrail(0x0ea5e9);
+const bobTrail   = makeTrail(0x7c3aed);
+
+function updateTrail(line, traj, upTo) {
+  if (upTo < 1) return;
+  const pts = [];
+  for (let i = 0; i <= upTo && i < traj.length; i++)
+    pts.push(toScene(...traj[i]));
+  line.geometry.dispose();
+  line.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+}
+
+// ── Drones ────────────────────────────────────────────────────────────────────
+function makeDrone(color) {
+  const group = new THREE.Group();
+  const body  = new THREE.Mesh(
+    new THREE.SphereGeometry(2.5, 16, 16),
+    new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.25 })
+  );
+  group.add(body);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(4, 0.4, 8, 32),
+    new THREE.MeshBasicMaterial({ color, opacity: 0.5, transparent: true })
+  );
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+  scene.add(group);
+  return group;
+}
+const aliceDrone = makeDrone(0x0ea5e9);
+const bobDrone   = makeDrone(0x7c3aed);
+aliceDrone.position.copy(toScene(...ALICE_TRAJ[0]));
+bobDrone.position.copy(toScene(...BOB_TRAJ[0]));
+
+// ── Halo collision ────────────────────────────────────────────────────────────
+const haloMat  = new THREE.MeshBasicMaterial({ color: 0xef4444, opacity: 0, transparent: true, wireframe: true });
+const haloMesh = new THREE.Mesh(new THREE.SphereGeometry(10, 12, 12), haloMat);
+scene.add(haloMesh);
+
+// ── Caméra orbitale manuelle ──────────────────────────────────────────────────
+let isDragging = false, lastX = 0, lastY = 0;
+let theta = 0.8, phi = 0.55, radius = 160;
+
+function updateCamera() {
+  camera.position.set(
+    radius * Math.sin(phi) * Math.sin(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.cos(theta)
+  );
+  camera.lookAt(0, 5, 0);
+}
+updateCamera();
+
+canvas.addEventListener('mousedown', e => { isDragging = true; lastX = e.clientX; lastY = e.clientY; });
+window.addEventListener('mouseup',   () => { isDragging = false; });
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  theta -= (e.clientX - lastX) * 0.008;
+  phi    = Math.max(0.1, Math.min(1.4, phi - (e.clientY - lastY) * 0.008));
+  lastX  = e.clientX; lastY = e.clientY;
+  updateCamera();
+});
+canvas.addEventListener('wheel', e => {
+  radius = Math.max(50, Math.min(350, radius + e.deltaY * 0.25));
+  updateCamera();
+  e.preventDefault();
+}, { passive: false });
+
+// ── Animation ─────────────────────────────────────────────────────────────────
+let collisionActive = false;
+
+(function animate() {
+  requestAnimationFrame(animate);
+  aliceDrone.children[1].rotation.z += 0.025;
+  bobDrone.children[1].rotation.z   -= 0.025;
+  if (collisionActive) {
+    const s = 1 + 0.25 * Math.sin(Date.now() * 0.006);
+    haloMesh.scale.setScalar(s);
+    haloMat.opacity = 0.25 + 0.15 * Math.sin(Date.now() * 0.006);
+  } else {
+    haloMat.opacity = 0;
   }
+  renderer.render(scene, camera);
+})();
 
-  // Trajectoire complète Alice (gris foncé)
-  ctx.strokeStyle = "#1e3a5f";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ALICE_TRAJ.forEach(([x,y], i) => {
-    const [cx, cy] = toCanvas(x, y);
-    i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
-  });
-  ctx.stroke();
-
-  // Trajectoire complète Bob (gris foncé)
-  ctx.strokeStyle = "#2d1b69";
-  ctx.beginPath();
-  BOB_TRAJ.forEach(([x,y], i) => {
-    const [cx, cy] = toCanvas(x, y);
-    i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
-  });
-  ctx.stroke();
-  ctx.setLineDash([]);
-
+// ── Mise à jour scène ─────────────────────────────────────────────────────────
+function updateScene(state) {
+  const posA = state.alice?.pos ?? ALICE_TRAJ[0];
+  const posB = state.bob?.pos   ?? BOB_TRAJ[0];
   const segA = state.alice?.seg ?? 0;
   const segB = state.bob?.seg   ?? 0;
 
-  // Chemin parcouru Alice (bleu vif)
-  if (segA > 0) {
-    ctx.strokeStyle = "#0ea5e9";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    for (let i = 0; i <= segA && i < ALICE_TRAJ.length; i++) {
-      const [cx, cy] = toCanvas(ALICE_TRAJ[i][0], ALICE_TRAJ[i][1]);
-      i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
-    }
-    ctx.stroke();
+  aliceDrone.position.copy(toScene(...posA));
+  bobDrone.position.copy(toScene(...posB));
+  updateTrail(aliceTrail, ALICE_TRAJ, segA);
+  updateTrail(bobTrail,   BOB_TRAJ,   segB);
+
+  collisionActive = !!state.collision;
+  if (collisionActive) {
+    const mid = new THREE.Vector3().addVectors(
+      toScene(...posA), toScene(...posB)
+    ).multiplyScalar(0.5);
+    haloMesh.position.copy(mid);
+    const red = new THREE.Color(0xef4444);
+    aliceDrone.children[0].material.color.copy(red);
+    aliceDrone.children[0].material.emissive.copy(red);
+    bobDrone.children[0].material.color.copy(red);
+    bobDrone.children[0].material.emissive.copy(red);
+  } else {
+    aliceDrone.children[0].material.color.setHex(0x0ea5e9);
+    aliceDrone.children[0].material.emissive.setHex(0x0ea5e9);
+    bobDrone.children[0].material.color.setHex(0x7c3aed);
+    bobDrone.children[0].material.emissive.setHex(0x7c3aed);
   }
-
-  // Chemin parcouru Bob (violet vif)
-  if (segB > 0) {
-    ctx.strokeStyle = "#a78bfa";
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    for (let i = 0; i <= segB && i < BOB_TRAJ.length; i++) {
-      const [cx, cy] = toCanvas(BOB_TRAJ[i][0], BOB_TRAJ[i][1]);
-      i === 0 ? ctx.moveTo(cx, cy) : ctx.lineTo(cx, cy);
-    }
-    ctx.stroke();
-  }
-
-  // Drone Alice (cercle bleu)
-  const posA = state.alice?.pos ?? ALICE_TRAJ[0];
-  const [ax, ay] = toCanvas(posA[0], posA[1]);
-  ctx.fillStyle = state.collision ? "#ef4444" : "#0ea5e9";
-  ctx.beginPath();
-  ctx.arc(ax, ay, state.collision ? 10 : 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "white";
-  ctx.font = "bold 9px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("A", ax, ay + 3);
-
-  // Drone Bob (cercle violet)
-  const posB = state.bob?.pos ?? BOB_TRAJ[0];
-  const [bx, by] = toCanvas(posB[0], posB[1]);
-  ctx.fillStyle = state.collision ? "#ef4444" : "#a78bfa";
-  ctx.beginPath();
-  ctx.arc(bx, by, state.collision ? 10 : 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "white";
-  ctx.font = "bold 9px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("B", bx, by + 3);
-
-  // Panneau collision sur la carte
-  if (state.collision) {
-    const mx = (ax + bx) / 2;
-    const my = (ay + by) / 2 - 30;
-    ctx.fillStyle = "rgba(239,68,68,0.9)";
-    ctx.beginPath();
-    ctx.roundRect(mx - 80, my - 14, 160, 28, 6);
-    ctx.fill();
-    ctx.fillStyle = "white";
-    ctx.font = "bold 11px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("⚠ COLLISION", mx, my + 5);
-  }
-
-  // Légende
-  ctx.font = "11px monospace";
-  ctx.textAlign = "left";
-  ctx.fillStyle = "#0ea5e9";
-  ctx.fillRect(20, 460, 12, 4);
-  ctx.fillText("Alice", 36, 466);
-  ctx.fillStyle = "#a78bfa";
-  ctx.fillRect(90, 460, 12, 4);
-  ctx.fillText("Bob", 106, 466);
 }
 
+// ── UI ────────────────────────────────────────────────────────────────────────
 function updateUI(state) {
-  // Carte
-  drawMap(state);
+  updateScene(state);
 
-  // Alerte
-  const alert = document.getElementById("alert");
-  if (state.collision) {
-    alert.style.display = "block";
-    alert.textContent = state.collision_msg || "⚠ COLLISION DÉTECTÉE — CHANGER D'ALTITUDE";
-  } else {
-    alert.style.display = "none";
-  }
+  const alertEl = document.getElementById('alert');
+  alertEl.style.display = state.collision ? 'block' : 'none';
+  if (state.collision)
+    alertEl.textContent = state.collision_msg || '⚠ COLLISION DÉTECTÉE — CHANGER D\'ALTITUDE';
 
-  // Positions
   const posA = state.alice?.pos ?? [0,0,0];
   const posB = state.bob?.pos   ?? [0,0,0];
-  document.getElementById("alice-pos").textContent =
-    `(${posA[0]}, ${posA[1]}, ${posA[2]})`;
-  document.getElementById("bob-pos").textContent =
-    `(${posB[0]}, ${posB[1]}, ${posB[2]})`;
+  document.getElementById('alice-pos').textContent = `(${posA[0]}, ${posA[1]}, ${posA[2]})`;
+  document.getElementById('bob-pos').textContent   = `(${posB[0]}, ${posB[1]}, ${posB[2]})`;
 
-  // Segments
-  const segA  = state.alice?.seg   ?? 0;
-  const segB  = state.bob?.seg     ?? 0;
-  const totA  = state.alice?.total ?? 15;
-  const totB  = state.bob?.total   ?? 15;
-  document.getElementById("alice-seg").textContent = `segment ${segA}/${totA}`;
-  document.getElementById("bob-seg").textContent   = `segment ${segB}/${totB}`;
-  document.getElementById("alice-bar").style.width = `${(segA/totA)*100}%`;
-  document.getElementById("bob-bar").style.width   = `${(segB/totB)*100}%`;
+  const segA = state.alice?.seg ?? 0, totA = state.alice?.total ?? 15;
+  const segB = state.bob?.seg   ?? 0, totB = state.bob?.total   ?? 15;
+  document.getElementById('alice-seg').textContent = `segment ${segA}/${totA}`;
+  document.getElementById('bob-seg').textContent   = `segment ${segB}/${totB}`;
+  document.getElementById('alice-bar').style.width = `${(segA/totA)*100}%`;
+  document.getElementById('bob-bar').style.width   = `${(segB/totB)*100}%`;
 
-  // Résultat
-  const rv = document.getElementById("result-val");
-  if (state.collision) {
-    rv.textContent = "⚠ COLLISION";
-    rv.className   = "card-val warn";
-  } else {
-    rv.textContent = "✓ PAS DE COLLISION";
-    rv.className   = "card-val ok";
-  }
-  document.getElementById("fhe-time").textContent =
-    state.fhe_time_ms ? `Durée : ${(state.fhe_time_ms/1000).toFixed(1)} s` : "—";
+  const rv = document.getElementById('result-val');
+  rv.textContent = state.collision ? '⚠ COLLISION' : '✓ PAS DE COLLISION';
+  rv.className   = 'card-val ' + (state.collision ? 'warn' : 'ok');
 
-  // Statut FHE
-  const dot   = document.getElementById("fhe-dot");
-  const label = document.getElementById("fhe-label");
-  if (state.fhe_running) {
-    dot.className   = "running";
-    label.textContent = "Calcul FHE en cours...";
-  } else {
-    dot.className   = "done";
-    label.textContent = "Calcul terminé";
-  }
+  document.getElementById('fhe-time').textContent =
+    state.fhe_time_ms ? `Durée : ${(state.fhe_time_ms/1000).toFixed(1)} s` : '—';
 
-  // Métriques
-  document.getElementById("ss-val").textContent    = state.scheme_switches ?? "—";
-  document.getElementById("total-time").textContent =
-    state.fhe_time_ms ? `${(state.fhe_time_ms/1000).toFixed(1)} s` : "—";
-  document.getElementById("sim-status").textContent =
-    state.finished ? "Simulation terminée" : `Seg Alice: ${segA} | Bob: ${segB}`;
+  const dot = document.getElementById('fhe-dot');
+  dot.className = state.fhe_running ? 'running' : 'done';
+  document.getElementById('fhe-label').textContent =
+    state.fhe_running ? 'Calcul FHE en cours...' : 'Calcul terminé';
+
+  document.getElementById('ss-val').textContent      = state.scheme_switches ?? '—';
+  document.getElementById('total-time').textContent  =
+    state.fhe_time_ms ? `${(state.fhe_time_ms/1000).toFixed(1)} s` : '—';
+  document.getElementById('sim-status').textContent  =
+    state.finished ? 'Simulation terminée' : `Seg Alice: ${segA} | Bob: ${segB}`;
 }
 
-// Polling toutes les 3 secondes
+// ── Polling ───────────────────────────────────────────────────────────────────
+updateScene({ alice:{pos:ALICE_TRAJ[0],seg:0,total:15}, bob:{pos:BOB_TRAJ[0],seg:0,total:15}, collision:false });
+
 async function poll() {
   try {
-    const r = await fetch(`${API}/api/drone_status`,
+    const r = await fetch('http://localhost:8765/api/drone_status',
       { signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      const state = await r.json();
-      updateUI(state);
-    }
-  } catch(e) {
-    console.warn("Serveur non joignable:", e.message);
-  }
+    if (r.ok) updateUI(await r.json());
+  } catch(e) { console.warn('Serveur non joignable:', e.message); }
 }
-
-// Dessin initial
-drawMap({alice:{pos:[0,50,30],seg:0,total:15}, bob:{pos:[100,0,30],seg:0,total:15},
-         collision:false});
-
 poll();
 setInterval(poll, 3000);
 </script>
