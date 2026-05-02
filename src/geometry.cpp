@@ -26,8 +26,6 @@ static std::pair<long,long> project2D(const IntPoint& p, GeometryEngine::DropAxi
 }
 
 
-
-// ===== 1) Fonctions en clair =====
 GeometryEngine::Orientation GeometryEngine::orientationClear2D(
     const IntPoint& p, const IntPoint& q, const IntPoint& r, DropAxis drop)
 {
