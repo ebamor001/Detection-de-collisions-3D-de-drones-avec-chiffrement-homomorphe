@@ -30,12 +30,12 @@ ALICE_PORT  = 9001
 ALICE_TRAJ = [
     (0, 0, 30),
     (10, 10, 30)
-]
+]  # used only for visualisation
 
 BOB_TRAJ = [
     (0, 50, 30),
     (10, 40, 30)
-]
+] 
 
 def send_data(sock, data):
     sock.sendall(struct.pack(">I", len(data)) + data)
