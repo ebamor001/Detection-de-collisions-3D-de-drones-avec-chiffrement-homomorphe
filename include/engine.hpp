@@ -103,6 +103,13 @@ public:
     size_t getSlotCount()    const { return config.batchSize; }
     void   printNoise(const CiphertextCKKS&, const std::string& label = "") const;
     
+    
+    void loadContext(
+        const CryptoContextCKKS& loadedCC,
+        const KeyPairCKKS& loadedKeys,
+        const Config& cfg
+    );
+    
     CryptoContextCKKS getCKKSContext() const { return cc; }
     const KeyPairCKKS& getKeys()       const { return keys; }
     const Config& getConfig()          const { return config; }

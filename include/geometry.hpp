@@ -9,6 +9,7 @@
 
 class GeometryEngine
 {
+    
 public:
     using CiphertextCKKS = CryptoEngine::CiphertextCKKS;
 
@@ -25,6 +26,12 @@ public:
         DROP_Y = 1,
         DROP_Z = 2
     };
+    struct EncDropChoice {
+        CiphertextCKKS chooseX;
+        CiphertextCKKS chooseY;
+        CiphertextCKKS chooseZ;
+    };
+
 
     explicit GeometryEngine(CryptoEngine *engine);
 
@@ -41,8 +48,12 @@ public:
     CiphertextCKKS extractOrientationSign(const CiphertextCKKS &orientationVal);
     CiphertextCKKS onSegment2D(const IntPoint &p, const IntPoint &q, const IntPoint &r, DropAxis drop, double eps);
     CiphertextCKKS checkSegmentIntersection2D(const Segment &seg1, const Segment &seg2, DropAxis drop);
+    EncDropChoice chooseDropAxisEncrypted(const CiphertextCKKS& nx,const CiphertextCKKS& ny,const CiphertextCKKS& nz);
     CiphertextCKKS checkSegmentIntersection3D(const Segment &seg1, const Segment &seg2);
-    // nouveau : version batchee (N paires en parallele)
+    CiphertextCKKS checkSegmentIntersection3DEncrypted(
+    const CiphertextCKKS& p1x,const CiphertextCKKS& p1y,const CiphertextCKKS& p1z,const CiphertextCKKS& q1x,const CiphertextCKKS& q1y,const CiphertextCKKS& q1z,
+    const CiphertextCKKS& p2x,const CiphertextCKKS& p2y, const CiphertextCKKS& p2z,const CiphertextCKKS& q2x,const CiphertextCKKS& q2y,const CiphertextCKKS& q2z);
+    //version batchee (N paires en parallele)
     std::vector<double> batchCheckIntersection3D(
         const Segment &mySeg,
         const std::vector<Segment> &neighbors);
@@ -87,6 +98,7 @@ public:
     size_t getSignExtractions() const { return signExtractions; }
     size_t getIntersectionTests() const { return intersectionTests; }
     size_t getBootstrapCount() const { return bootstrapCount; }
+
 
 private:
     CryptoEngine *engine;

@@ -6,11 +6,23 @@
 
 CryptoEngine::CryptoEngine() : initialized(false), switchingReady(false), pLWE_(0) {}
 
+void CryptoEngine::loadContext(const CryptoContextCKKS& loadedCC,const KeyPairCKKS& loadedKeys,const Config& cfg) {
+    config = cfg;
+    cc = loadedCC;
+    keys = loadedKeys;
+
+    initialized = true;
+    switchingReady = false;
+    pLWE_ = 0;
+
+    std::cout << "CryptoEngine loaded from serialized context\n";
+}
+
 void CryptoEngine::initialize(const Config& cfg) {
     config = cfg;
-
     CCParams<CryptoContextCKKSRNS> params;
 
+    
     // avant batching
     // params.SetMultiplicativeDepth(17);
     // apres batching

@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cmath>
 
+
 GeometryEngine::GeometryEngine(CryptoEngine* eng) : engine(eng) {
     if (!engine || !engine->isInitialized()) {
         throw std::runtime_error("GeometryEngine requires initialized CryptoEngine");
@@ -521,144 +522,191 @@ std::vector<double> GeometryEngine::batchCheckIntersection3D(
 
 // ===== 3) Validation / stats =====
 
-// ── Version chiffree de batchCheckIntersection3D ─────────────────────────────
-// Prend deux ciphertexts [x1,y1,z1,x2,y2,z2] — un par drone
-// Fait tout le calcul sous FHE : produit vectoriel, produit mixte, orientations
-// Renvoie 1.0 si collision, 0.0 sinon
-double GeometryEngine::batchCheckIntersection3D_encrypted(
-    const CiphertextCKKS& ct_seg1,
-    const CiphertextCKKS& ct_seg2)
+
+
+
+
+GeometryEngine::EncDropChoice GeometryEngine::chooseDropAxisEncrypted(
+    const CiphertextCKKS& nx,
+    const CiphertextCKKS& ny,
+    const CiphertextCKKS& nz)
 {
     auto cc = engine->getCKKSContext();
 
-    // ── Extraire les coordonnees des deux segments depuis les ciphertexts ──────
-    // ct_seg1 = [x1, y1, z1, x2, y2, z2] pour le segment d'Alice
-    // ct_seg2 = [x1, y1, z1, x2, y2, z2] pour le segment de Bob
-    // On extrait chaque coordonnee en dechiffrant (Alice a deja chiffre avec pk)
-    // Bob peut faire ce calcul car il a le contexte et les eval keys
+    // Compare nx², ny², nz² instead of |nx|, |ny|, |nz|
+    auto nx2 = cc->EvalMult(nx, nx);
+    auto ny2 = cc->EvalMult(ny, ny);
+    auto nz2 = cc->EvalMult(nz, nz);
 
-    // Vecteur de selection pour extraire chaque slot
-    // slot i = 1.0 dans le vecteur de selection, 0 ailleurs
-    auto extractSlot = [&](const CiphertextCKKS& ct, int slot) -> CiphertextCKKS {
-        std::vector<double> mask(6, 0.0);
-        mask[slot] = 1.0;
-        auto pt_mask = cc->MakeCKKSPackedPlaintext(mask);
-        auto ct_masked = cc->EvalMult(ct, pt_mask);
-        // Somme de rotation pour ramener la valeur en slot 0
-        auto ct_sum = ct_masked;
-        for (int i = 1; i < 6; i *= 2) {
-            auto ct_rot = cc->EvalRotate(ct_sum, slot);
-            ct_sum = cc->EvalAdd(ct_sum, ct_rot);
-        }
-        // Garder seulement slot 0
-        std::vector<double> keep(6, 0.0);
-        keep[0] = 1.0;
-        auto pt_keep = cc->MakeCKKSPackedPlaintext(keep);
-        return cc->EvalMult(ct_sum, pt_keep);
-    };
+    // Normalize before scheme switching comparisons
+    auto scale = engine->constLike(nx2, 1.0 / 1000000.0);
+    nx2 = cc->EvalMult(nx2, scale);
+    ny2 = cc->EvalMult(ny2, scale);
+    nz2 = cc->EvalMult(nz2, scale);
 
-    // Extraire les 6 coordonnees de chaque segment
-    // Segment 1 (Alice) : P1=(x1,y1,z1), Q1=(x2,y2,z2)
-    auto ct_p1x = extractSlot(ct_seg1, 0);
-    auto ct_p1y = extractSlot(ct_seg1, 1);
-    auto ct_p1z = extractSlot(ct_seg1, 2);
-    auto ct_q1x = extractSlot(ct_seg1, 3);
-    auto ct_q1y = extractSlot(ct_seg1, 4);
-    auto ct_q1z = extractSlot(ct_seg1, 5);
+    // bxy = 1 if nx² > ny²
+    auto bxy = engine->compareGreaterThanZero(cc->EvalSub(nx2, ny2));
 
-    // Segment 2 (Bob) : P2=(x1,y1,z1), Q2=(x2,y2,z2)
-    auto ct_p2x = extractSlot(ct_seg2, 0);
-    auto ct_p2y = extractSlot(ct_seg2, 1);
-    auto ct_p2z = extractSlot(ct_seg2, 2);
-    auto ct_q2x = extractSlot(ct_seg2, 3);
-    auto ct_q2y = extractSlot(ct_seg2, 4);
-    auto ct_q2z = extractSlot(ct_seg2, 5);
+    auto one = engine->oneLike(bxy);
+    auto not_bxy = cc->EvalSub(one, bxy);
 
-    // ── Direction des segments sous FHE ───────────────────────────────────────
-    // d1 = Q1 - P1
-    auto ct_d1x = cc->EvalSub(ct_q1x, ct_p1x);
-    auto ct_d1y = cc->EvalSub(ct_q1y, ct_p1y);
-    auto ct_d1z = cc->EvalSub(ct_q1z, ct_p1z);
+    // maxXY = bxy * nx² + (1-bxy) * ny²
+    auto maxXY = cc->EvalAdd(
+        cc->EvalMult(bxy, nx2),
+        cc->EvalMult(not_bxy, ny2)
+    );
 
-    // d2 = Q2 - P2
-    auto ct_d2x = cc->EvalSub(ct_q2x, ct_p2x);
-    auto ct_d2y = cc->EvalSub(ct_q2y, ct_p2y);
-    auto ct_d2z = cc->EvalSub(ct_q2z, ct_p2z);
+    // bxyz = 1 if max(nx², ny²) > nz²
+    auto bxyz = engine->compareGreaterThanZero(cc->EvalSub(maxXY, nz2));
 
-    // ── Produit vectoriel n = d1 x d2 sous FHE ───────────────────────────────
-    // nx = d1y*d2z - d1z*d2y
-    auto ct_nx = cc->EvalSub(
-        cc->EvalMult(ct_d1y, ct_d2z),
-        cc->EvalMult(ct_d1z, ct_d2y));
-    // ny = d1z*d2x - d1x*d2z
-    auto ct_ny = cc->EvalSub(
-        cc->EvalMult(ct_d1z, ct_d2x),
-        cc->EvalMult(ct_d1x, ct_d2z));
-    // nz = d1x*d2y - d1y*d2x
-    auto ct_nz = cc->EvalSub(
-        cc->EvalMult(ct_d1x, ct_d2y),
-        cc->EvalMult(ct_d1y, ct_d2x));
+    auto not_bxyz = cc->EvalSub(engine->oneLike(bxyz), bxyz);
 
-    // ── Produit mixte w = (P2-P1) . n sous FHE ───────────────────────────────
-    // w = (p2x-p1x)*nx + (p2y-p1y)*ny + (p2z-p1z)*nz
-    auto ct_wx = cc->EvalSub(ct_p2x, ct_p1x);
-    auto ct_wy = cc->EvalSub(ct_p2y, ct_p1y);
-    auto ct_wz = cc->EvalSub(ct_p2z, ct_p1z);
+    EncDropChoice choice;
 
-    auto ct_cop = cc->EvalAdd(
-        cc->EvalAdd(
-            cc->EvalMult(ct_wx, ct_nx),
-            cc->EvalMult(ct_wy, ct_ny)),
-        cc->EvalMult(ct_wz, ct_nz));
+    // If bxyz = 1, max is X or Y.
+    // If bxyz = 0, max is Z.
+    choice.chooseX = cc->EvalMult(bxyz, bxy);
+    choice.chooseY = cc->EvalMult(bxyz, not_bxy);
+    choice.chooseZ = not_bxyz;
 
-    // ── Test de coplanarite sous FHE (2 SS) ───────────────────────────────────
-    auto ct_copOK = engine->isNearZeroBand(ct_cop, 1.0);
     bootstrapCount += 2;
 
-    double copVal = engine->decryptValue(ct_copOK);
-    if (copVal < 0.5) {
-        // Pas coplanaires → pas de collision
-        intersectionTests++;
-        return 0.0;
-    }
+    return choice;
+}
 
-    // ── Orientations 2D sous FHE (projection sur plan XY) ────────────────────
-    // o1 = orient(P1,Q1,P2) = d1y*(p2x-q1x) - d1x*(p2y-q1y)
-    auto ct_o1 = cc->EvalSub(
-        cc->EvalMult(ct_d1y, cc->EvalSub(ct_p2x, ct_q1x)),
-        cc->EvalMult(ct_d1x, cc->EvalSub(ct_p2y, ct_q1y)));
+// ── Version chiffree de batchCheckIntersection3D ─────────────────────────────
+// Prend 6 ciphertexts [x1,y1,z1,x2,y2,z2] — un par drone
+// Fait tout le calcul sous FHE : produit vectoriel, produit mixte, orientations
+// Renvoie 1.0 si collision, 0.0 sinon
+CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted(
+    const CiphertextCKKS& p1x,
+    const CiphertextCKKS& p1y,
+    const CiphertextCKKS& p1z,
+    const CiphertextCKKS& q1x,
+    const CiphertextCKKS& q1y,
+    const CiphertextCKKS& q1z,
+    const CiphertextCKKS& p2x,
+    const CiphertextCKKS& p2y,
+    const CiphertextCKKS& p2z,
+    const CiphertextCKKS& q2x,
+    const CiphertextCKKS& q2y,
+    const CiphertextCKKS& q2z
+) {
+    auto cc = engine->getCKKSContext();
 
-    // o2 = orient(P1,Q1,Q2) = d1y*(q2x-q1x) - d1x*(q2y-q1y)
-    auto ct_o2 = cc->EvalSub(
-        cc->EvalMult(ct_d1y, cc->EvalSub(ct_q2x, ct_q1x)),
-        cc->EvalMult(ct_d1x, cc->EvalSub(ct_q2y, ct_q1y)));
+    // 1. Directions
+    auto d1x = cc->EvalSub(q1x, p1x);
+    auto d1y = cc->EvalSub(q1y, p1y);
+    auto d1z = cc->EvalSub(q1z, p1z);
 
-    // o3 = orient(P2,Q2,P1) = d2y*(p1x-q2x) - d2x*(p1y-q2y)
-    auto ct_o3 = cc->EvalSub(
-        cc->EvalMult(ct_d2y, cc->EvalSub(ct_p1x, ct_q2x)),
-        cc->EvalMult(ct_d2x, cc->EvalSub(ct_p1y, ct_q2y)));
+    auto d2x = cc->EvalSub(q2x, p2x);
+    auto d2y = cc->EvalSub(q2y, p2y);
+    auto d2z = cc->EvalSub(q2z, p2z);
 
-    // o4 = orient(P2,Q2,Q1) = d2y*(q1x-q2x) - d2x*(q1y-q2y)
-    auto ct_o4 = cc->EvalSub(
-        cc->EvalMult(ct_d2y, cc->EvalSub(ct_q1x, ct_q2x)),
-        cc->EvalMult(ct_d2x, cc->EvalSub(ct_q1y, ct_q2y)));
+    // 2. Produit vectoriel n = d1 × d2
+    auto nx = cc->EvalSub(cc->EvalMult(d1y, d2z), cc->EvalMult(d1z, d2y));
+    auto ny = cc->EvalSub(cc->EvalMult(d1z, d2x), cc->EvalMult(d1x, d2z));
+    auto nz = cc->EvalSub(cc->EvalMult(d1x, d2y), cc->EvalMult(d1y, d2x));
 
-    // ── Extraction des signes (4 SS) ──────────────────────────────────────────
-    auto ct_s1 = engine->compareGreaterThanZero(ct_o1);
-    auto ct_s2 = engine->compareGreaterThanZero(ct_o2);
-    auto ct_s3 = engine->compareGreaterThanZero(ct_o3);
-    auto ct_s4 = engine->compareGreaterThanZero(ct_o4);
-    bootstrapCount += 4;
-    signExtractions += 4;
+    // 3. Choix chiffré du plan de projection
+    auto dropChoice = chooseDropAxisEncrypted(nx, ny, nz);
 
-    // ── Logique booleenne : XOR(s1,s2) AND XOR(s3,s4) ────────────────────────
-    auto ct_xor12 = engine->eXor(ct_s1, ct_s2);
-    auto ct_xor34 = engine->eXor(ct_s3, ct_s4);
-    auto ct_inter = engine->eAnd(ct_xor12, ct_xor34);
+    auto selectA = [&](const CiphertextCKKS& x,
+                       const CiphertextCKKS& y,
+                       const CiphertextCKKS& z) {
+        return cc->EvalAdd(
+            cc->EvalAdd(
+                cc->EvalMult(dropChoice.chooseX, y), // DROP_X -> y
+                cc->EvalMult(dropChoice.chooseY, x)  // DROP_Y -> x
+            ),
+            cc->EvalMult(dropChoice.chooseZ, x)      // DROP_Z -> x
+        );
+    };
 
-    double result = engine->decryptValue(ct_inter);
+    auto selectB = [&](const CiphertextCKKS& x,
+                       const CiphertextCKKS& y,
+                       const CiphertextCKKS& z) {
+        return cc->EvalAdd(
+            cc->EvalAdd(
+                cc->EvalMult(dropChoice.chooseX, z), // DROP_X -> z
+                cc->EvalMult(dropChoice.chooseY, z)  // DROP_Y -> z
+            ),
+            cc->EvalMult(dropChoice.chooseZ, y)      // DROP_Z -> y
+        );
+    };
+
+    auto p1a = selectA(p1x, p1y, p1z);
+    auto p1b = selectB(p1x, p1y, p1z);
+    auto q1a = selectA(q1x, q1y, q1z);
+    auto q1b = selectB(q1x, q1y, q1z);
+
+    auto p2a = selectA(p2x, p2y, p2z);
+    auto p2b = selectB(p2x, p2y, p2z);
+    auto q2a = selectA(q2x, q2y, q2z);
+    auto q2b = selectB(q2x, q2y, q2z);
+
+    // 4. Produit mixte : cop = (P2 - P1) · n
+    auto wx = cc->EvalSub(p2x, p1x);
+    auto wy = cc->EvalSub(p2y, p1y);
+    auto wz = cc->EvalSub(p2z, p1z);
+
+    auto cop = cc->EvalAdd(
+        cc->EvalAdd(
+            cc->EvalMult(wx, nx),
+            cc->EvalMult(wy, ny)
+        ),
+        cc->EvalMult(wz, nz)
+    );
+
+    auto copOK = engine->isNearZeroBand(cop, 1.0);
+    bootstrapCount += 2;
+
+    // 5. Orientations 2D sur la projection choisie
+    auto d1a = cc->EvalSub(q1a, p1a);
+    auto d1b = cc->EvalSub(q1b, p1b);
+
+    auto d2a = cc->EvalSub(q2a, p2a);
+    auto d2b = cc->EvalSub(q2b, p2b);
+
+    auto o1 = cc->EvalSub(
+        cc->EvalMult(d1b, cc->EvalSub(p2a, q1a)),
+        cc->EvalMult(d1a, cc->EvalSub(p2b, q1b))
+    );
+
+    auto o2 = cc->EvalSub(
+        cc->EvalMult(d1b, cc->EvalSub(q2a, q1a)),
+        cc->EvalMult(d1a, cc->EvalSub(q2b, q1b))
+    );
+
+    auto o3 = cc->EvalSub(
+        cc->EvalMult(d2b, cc->EvalSub(p1a, q2a)),
+        cc->EvalMult(d2a, cc->EvalSub(p1b, q2b))
+    );
+
+    auto o4 = cc->EvalSub(
+        cc->EvalMult(d2b, cc->EvalSub(q1a, q2a)),
+        cc->EvalMult(d2a, cc->EvalSub(q1b, q2b))
+    );
+
+    orientationComputations += 4;
+
+    // 6. Cas général : signes opposés
+    // Intersection si o1*o2 < 0 ET o3*o4 < 0
+    auto norm = engine->constLike(o1, 1.0 / 100000.0);
+
+    auto p12 = cc->EvalMult(cc->EvalMult(o1, o2), norm);
+    auto p34 = cc->EvalMult(cc->EvalMult(o3, o4), norm);
+
+    auto opp12 = engine->ltZero(p12);
+    auto opp34 = engine->ltZero(p34);
+    bootstrapCount += 2;
+
+    auto inter2D = engine->eAnd(opp12, opp34);
+
+    // 7. Résultat final : coplanaire ET intersection 2D
     intersectionTests++;
-    return result;
+
+    return engine->eAnd(copOK, inter2D);
 }
 
 bool GeometryEngine::validatePoints(const IntPoint& p, const IntPoint& q, const IntPoint& r) const {
@@ -785,7 +833,7 @@ double GeometryEngine::selectBestAltitude(
     double delta,
     int k)
 {
-    auto result = engine->decryptVector(availability);
+    auto result = engine->decryptVector(availability,k);
     std::vector<double> candidates;
     for (int j = 1; j <= k/2; j++) {
         candidates.push_back(currentAltitude + j * delta);
