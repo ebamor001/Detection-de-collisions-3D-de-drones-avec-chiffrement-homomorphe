@@ -23,8 +23,7 @@ BINARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", 
 ALICE_PORT = 9001
 
 ALICE_TRAJ = [
-    (0, 50, 30), (6, 54, 30), (13, 58, 30), (20, 61, 30), (26, 64, 30),
-    (33, 67, 30)
+    (0, 50, 30), (6, 54, 30)
 ]
 
 BOB_TRAJ = [
@@ -155,14 +154,13 @@ def main():
             print(f"[Alice] Contexte recu : {len(ctx_data)/1024:.1f} KB")
             print(f"[Alice] PK Bob       : {len(pk_bob_data)/1024:.1f} KB")
 
-            ALT_EPS = 1.0
+            total_fhe_ms = 0.0
 
             n = len(ALICE_TRAJ) - 1
             for seg in range(1, n + 1):
                 print(f"\n[Alice] === Segment {seg}/{n} ===")
 
                 seg_alice = [ALICE_TRAJ[seg - 1], ALICE_TRAJ[seg]]
-                z_alice = (seg_alice[0][2] + seg_alice[1][2]) / 2.0
 
                 f_alice_path = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False).name
                 f_alice_ct = tempfile.NamedTemporaryFile(suffix="_ct_alice.bin", delete=False).name
@@ -174,43 +172,42 @@ def main():
                         f.write(pts_to_str(seg_alice) + "\n")
 
                     print("[Alice] Chiffrement du segment d'Alice avec pk_bob...", flush=True)
+                    t_enc = time.time()
                     cpp_send(cpp_proc, f"ENCRYPT_PATH {f_alice_path} {f_alice_ct}")
+                    ms_enc = (time.time() - t_enc) * 1000.0
                     send_data(conn, str(seg).encode())
-
-                    bob_alt_data = recv_data(conn)
-                    bob_alt = json.loads(bob_alt_data.decode())
-                    z_bob = bob_alt["z"]
-                    same_altitude = abs(z_alice - z_bob) < ALT_EPS
-                    print(f"[Alice] Altitude Alice={z_alice}, Bob={z_bob} → same_altitude={same_altitude}")
 
                     bob_ct_data = recv_data(conn)
                     write_file(f_bob_ct, bob_ct_data)
                     print(f"[Alice] Ciphertext Bob recu : {len(bob_ct_data)/1024:.1f} KB")
 
-                    bob_pos_data = recv_data(conn)
-                    bob_pos = json.loads(bob_pos_data.decode())
+                    print("[Alice] Calcul FHE (DETECT_PATH)...", flush=True)
+                    t_det = time.time()
 
-                    print("[Alice] Calcul FHE...", flush=True)
-                    t0 = time.time()
-
-                    same_alt_flag = "1" if same_altitude else "0"
                     out = cpp_send(
                         cpp_proc,
-                        f"DETECT_PATH {f_alice_ct} {f_bob_ct} {f_result_ct} {same_alt_flag}"
+                        f"DETECT_PATH {f_alice_ct} {f_bob_ct} {f_result_ct} 0"
                     )
 
-                    ms = (time.time() - t0) * 1000.0
+                    ms_det = (time.time() - t_det) * 1000.0
+                    ms = ms_enc + ms_det
+                    total_fhe_ms += ms
 
                     ss = 0
                     if "scheme_switches=" in out:
                         ss = int(out.split("scheme_switches=")[1].split()[0])
                     result_ct_data = read_file(f_result_ct)
 
-                    fhe_meta = json.dumps({"fhe_time_ms": round(ms, 1), "scheme_switches": ss}).encode()
+                    fhe_meta = json.dumps({
+                        "fhe_time_ms": round(ms, 1),
+                        "fhe_enc_ms": round(ms_enc, 1),
+                        "fhe_det_ms": round(ms_det, 1),
+                        "scheme_switches": ss
+                    }).encode()
                     send_data(conn, result_ct_data)
                     send_data(conn, fhe_meta)
 
-                    print(f"[Alice] Resultat chiffre envoye a Bob ({ms:.0f} ms, {ss} SS)")
+                    print(f"[Alice] Segment {seg}: encrypt={ms_enc:.0f} ms, detect={ms_det:.0f} ms, total={ms:.0f} ms ({ss} SS)")
 
                 finally:
                     for path in [f_alice_path, f_alice_ct, f_bob_ct, f_result_ct]:
@@ -221,6 +218,7 @@ def main():
 
                 time.sleep(0.5)
 
+            print(f"\n[Alice] Temps FHE total (encrypt + detect, tous segments) : {total_fhe_ms:.0f} ms ({total_fhe_ms/1000:.2f} s)")
             print("\n[Alice] Simulation terminee.")
 
         finally:

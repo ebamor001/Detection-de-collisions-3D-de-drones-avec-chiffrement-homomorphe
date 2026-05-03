@@ -208,23 +208,12 @@ def main():
                 with open(f_path, "w") as f:
                     f.write(pts_to_str(seg_bob) + "\n")
 
-                z_bob = (seg_bob[0][2] + seg_bob[1][2]) / 2.0
-                alt_meta = json.dumps({"z": z_bob}).encode()
-                send_data(sock, alt_meta)
-                print(f"[Bob] Altitude envoyee en clair : z={z_bob}")
-
                 print("[Bob] Chiffrement avec pk_bob...")
                 cpp_send(cpp_proc, f"ENCRYPT_PATH {f_path} {ct_bob}")
 
                 ct_bob_data = read_file(ct_bob)
                 print(f"[Bob] Ciphertext : {len(ct_bob_data)/1024:.1f} KB — envoi a Alice...")
                 send_data(sock, ct_bob_data)
-
-                pos_info = json.dumps({
-                    "pos": list(BOB_TRAJ[seg]),
-                    "seg": seg
-                }).encode()
-                send_data(sock, pos_info)
 
                 result_ct_data = recv_data(sock)
                 write_file(result_ct_file, result_ct_data)
@@ -236,6 +225,7 @@ def main():
 
                 collision = "collision=1" in out
                 print(f"[Bob] Resultat : {'COLLISION' if collision else 'LIBRE'}")
+                print(f"[Bob] Temps FHE Alice — encrypt={fhe_meta.get('fhe_enc_ms',0):.0f} ms, detect={fhe_meta.get('fhe_det_ms',0):.0f} ms, total={fhe_meta.get('fhe_time_ms',0):.0f} ms")
 
                 write_state({
                     "alice": {"pos": list(ALICE_TRAJ[seg]), "seg": seg, "total": len(ALICE_TRAJ) - 1},
