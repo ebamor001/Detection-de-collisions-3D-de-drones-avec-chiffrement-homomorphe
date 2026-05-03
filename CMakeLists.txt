@@ -23,7 +23,7 @@ add_executable(drone_fhe
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    src/main_alice_bob.cpp
+    main_alice_bob.cpp
 )
 
 target_link_libraries(drone_fhe

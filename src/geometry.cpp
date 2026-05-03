@@ -520,7 +520,6 @@ std::vector<double> GeometryEngine::batchCheckIntersection3D(
 }
 
 
-// ===== 3) Validation / stats =====
 
 
 
@@ -708,6 +707,9 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
 
     return engine->eAnd(copOK, inter2D);
 }
+
+
+// ===== 3) Validation / stats =====
 
 bool GeometryEngine::validatePoints(const IntPoint& p, const IntPoint& q, const IntPoint& r) const {
     auto isValid = [](const IntPoint& pt) {
