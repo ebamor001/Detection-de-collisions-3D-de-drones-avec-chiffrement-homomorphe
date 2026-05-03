@@ -1,3 +1,15 @@
+# Build
 build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Binaries
 *.bin
 drone_fhe
+drone_collision
+
+# Temp
+*.log
+*.json
