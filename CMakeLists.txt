@@ -16,33 +16,42 @@ include_directories(/usr/local/include/openfhe/binfhe)
 include_directories(/usr/local/include/openfhe/core)
 
 # =========================
-# Exécutable principal Alice/Bob
+# Exécutables
 # =========================
-add_executable(drone_fhe
+add_executable(drone_batching
+    src/main_batching.cpp
     src/engine.cpp
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    main_alice_bob.cpp
 )
-
-target_link_libraries(drone_fhe
+target_link_libraries(drone_batching
     ${OpenFHE_LIBRARIES}
     OpenMP::OpenMP_CXX
 )
 
-# =========================
-# Ancien main centralisé
-# =========================
-add_executable(drone_collision
+
+add_executable(drone_full_fhe
+    src/main_full_fhe.cpp
     src/engine.cpp
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    src/main_centralise.cpp
+)
+target_link_libraries(drone_full_fhe
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
 )
 
-target_link_libraries(drone_collision
+add_executable(drone_fhe
+    main_alice_bob.cpp
+    src/engine.cpp
+    src/geometry.cpp
+    src/intersection.cpp
+    src/io.cpp
+)
+
+target_link_libraries(drone_fhe
     ${OpenFHE_LIBRARIES}
     OpenMP::OpenMP_CXX
 )

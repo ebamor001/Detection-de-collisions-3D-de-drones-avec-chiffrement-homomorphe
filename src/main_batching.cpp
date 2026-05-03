@@ -165,7 +165,7 @@ int main(int argc, char* argv[])
         // 6. CALCUL DES STATS BATCHING
         // =========================
         size_t actual_ss       = geometry.getBootstrapCount();
-        size_t theo_ss_nobatch = segments_tested * 9; // 9 SS/paire sans batching
+        size_t theo_ss_nobatch = segments_tested * 6; // 6 SS/paire sans batching
         size_t gain_ss         = theo_ss_nobatch / std::max((size_t)1, actual_ss);
 
         // temps estimé sans batching (820 ms par scheme-switch + 45s keygen)
@@ -218,7 +218,7 @@ int main(int argc, char* argv[])
             std::cout << "+--------------------------------------------------+\n";
             std::cout << "| SCHEME-SWITCHES                                  |\n";
             std::cout << "|   Sans batching (theorique) : " << theo_ss_nobatch
-                      << " SS  (" << segments_tested << " x 9)\n";
+                      << " SS  (" << segments_tested << " x 6)\n";
             std::cout << "|   Avec batching (reel)      : " << actual_ss
                       << " SS  (2 copla + 4 orient)\n";
             std::cout << "|   GAIN                      : x" << gain_ss << "\n";
