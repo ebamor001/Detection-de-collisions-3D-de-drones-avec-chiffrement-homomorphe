@@ -480,22 +480,18 @@ std::vector<double> GeometryEngine::batchCheckIntersection3D(
 
         orientationComputations += 4 * K;
 
-        // extraction des signes : 4 scheme switches pour K paires
-        // avant batching : 4*K scheme switches
-        // apres batching : 4 scheme switches (quel que soit K)
-        auto ct_s1 = engine->compareGtZeroPacked(ct_o1, K);
-        auto ct_s2 = engine->compareGtZeroPacked(ct_o2, K);
-        auto ct_s3 = engine->compareGtZeroPacked(ct_o3, K);
-        auto ct_s4 = engine->compareGtZeroPacked(ct_o4, K);
-        bootstrapCount += 4;
-        signExtractions += 4;
+        // produit des orientations
+        auto ct_p12 = engine->mult(ct_o1, ct_o2);
+        auto ct_p34 = engine->mult(ct_o3, ct_o4);
 
-        // logique booleenne : XOR(s1,s2) AND XOR(s3,s4)
-        // signes opposes = segments qui se croisent
-        // tout en CKKS pur, 0 scheme switch
-        auto ct_xor12 = engine->eXor(ct_s1, ct_s2);
-        auto ct_xor34 = engine->eXor(ct_s3, ct_s4);
-        auto ct_inter = engine->eAnd(ct_xor12, ct_xor34);
+        // test signe du produit (2 scheme switches au lieu de 4)
+        auto ct_opp12 = engine->ltZero(ct_p12);
+        auto ct_opp34 = engine->ltZero(ct_p34);
+
+        bootstrapCount += 2;
+
+        // intersection si signes opposés
+        auto ct_inter = engine->eAnd(ct_opp12, ct_opp34);
 
         // lire les resultats et les stocker
         auto interResults = engine->decryptVector(ct_inter, K);

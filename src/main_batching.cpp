@@ -220,7 +220,7 @@ int main(int argc, char* argv[])
             std::cout << "|   Sans batching (theorique) : " << theo_ss_nobatch
                       << " SS  (" << segments_tested << " x 6)\n";
             std::cout << "|   Avec batching (reel)      : " << actual_ss
-                      << " SS  (2 copla + 4 orient)\n";
+                      << " SS  (2 copla + 2 produits d'orientations)\n";
             std::cout << "|   GAIN                      : x" << gain_ss << "\n";
             std::cout << "+--------------------------------------------------+\n";
             std::cout << "| TEMPS ESTIME (820 ms/SS + 45s keygen)            |\n";
@@ -253,8 +253,8 @@ int main(int argc, char* argv[])
             std::cout << "\n  [CSV] N,ss_batch,ss_nobatch,gain\n";
             for (size_t n = 1; n <= 20; n++)
             {
-                size_t ss_b  = 6;           // constant avec batching
-                size_t ss_nb = n * 9;
+                size_t ss_b  = 4;
+                size_t ss_nb = n * 6;
                 std::cout << "  " << n << "," << ss_b << "," << ss_nb
                           << "," << (ss_nb / ss_b) << "\n";
             }

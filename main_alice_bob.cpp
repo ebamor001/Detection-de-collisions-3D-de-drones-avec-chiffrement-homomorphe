@@ -470,90 +470,123 @@ static int modeDetectEncrypted(const std::map<std::string,std::string>& args) {
     std::string ct2_pref  = args.count("--ct2")  ? args.at("--ct2")  : "ct_bob";
     std::string out_pref  = args.count("--out")  ? args.at("--out")  : "ct_result";
 
-    // Charger le contexte et les clés d'évaluation d'Alice (pas de clé secrète ici)
     auto cc = deserializeContext(readFile(ctx_file));
     deserializeEvalMultKeys(cc, readFile(emk_file));
 
-    // Charger les 12 ciphertexts (6 Alice + 6 Bob), tous chiffrés sous pk_Alice
     auto loadCt = [&](const std::string& pref, const std::string& s) {
         return deserializeCiphertext(readFile(pref + s + ".bin"));
     };
 
-    auto ct_p1x = loadCt(ct1_pref, "_p1x");  // Alice : début segment
-    auto ct_p1y = loadCt(ct1_pref, "_p1y");
-    auto ct_p1z = loadCt(ct1_pref, "_p1z");
-    auto ct_q1x = loadCt(ct1_pref, "_q1x");  // Alice : fin segment
-    auto ct_q1y = loadCt(ct1_pref, "_q1y");
-    auto ct_q1z = loadCt(ct1_pref, "_q1z");
+    auto p1x = loadCt(ct1_pref, "_p1x");
+    auto p1y = loadCt(ct1_pref, "_p1y");
+    auto p1z = loadCt(ct1_pref, "_p1z");
+    auto q1x = loadCt(ct1_pref, "_q1x");
+    auto q1y = loadCt(ct1_pref, "_q1y");
+    auto q1z = loadCt(ct1_pref, "_q1z");
 
-    auto ct_p2x = loadCt(ct2_pref, "_p1x");  // Bob : début segment
-    auto ct_p2y = loadCt(ct2_pref, "_p1y");
-    auto ct_p2z = loadCt(ct2_pref, "_p1z");
-    auto ct_q2x = loadCt(ct2_pref, "_q1x");  // Bob : fin segment
-    auto ct_q2y = loadCt(ct2_pref, "_q1y");
-    auto ct_q2z = loadCt(ct2_pref, "_q1z");
+    auto p2x = loadCt(ct2_pref, "_p1x");
+    auto p2y = loadCt(ct2_pref, "_p1y");
+    auto p2z = loadCt(ct2_pref, "_p1z");
+    auto q2x = loadCt(ct2_pref, "_q1x");
+    auto q2y = loadCt(ct2_pref, "_q1y");
+    auto q2z = loadCt(ct2_pref, "_q1z");
 
-    std::cout << "[detect_enc] 12 ciphertexts charges\n"; std::cout.flush();
+    std::cout << "[detect_enc] 12 ciphertexts charges — calcul CKKS 3D\n";
+    std::cout.flush();
+
     auto t0 = std::chrono::high_resolution_clock::now();
 
-    // ── Directions des segments sous FHE (cc = contexte Alice) ──────────────
-    auto ct_d1x = cc->EvalSub(ct_q1x, ct_p1x);
-    auto ct_d1y = cc->EvalSub(ct_q1y, ct_p1y);
-    auto ct_d1z = cc->EvalSub(ct_q1z, ct_p1z);
+    auto d1x = cc->EvalSub(q1x, p1x);
+    auto d1y = cc->EvalSub(q1y, p1y);
+    auto d1z = cc->EvalSub(q1z, p1z);
 
-    auto ct_d2x = cc->EvalSub(ct_q2x, ct_p2x);
-    auto ct_d2y = cc->EvalSub(ct_q2y, ct_p2y);
-    auto ct_d2z = cc->EvalSub(ct_q2z, ct_p2z);
+    auto d2x = cc->EvalSub(q2x, p2x);
+    auto d2y = cc->EvalSub(q2y, p2y);
+    auto d2z = cc->EvalSub(q2z, p2z);
 
-    // ── Produit vectoriel n = d1 × d2 (test 3D) ─────────────────────────────
-    auto ct_nx = cc->EvalSub(cc->EvalMult(ct_d1y,ct_d2z), cc->EvalMult(ct_d1z,ct_d2y));
-    auto ct_ny = cc->EvalSub(cc->EvalMult(ct_d1z,ct_d2x), cc->EvalMult(ct_d1x,ct_d2z));
-    auto ct_nz = cc->EvalSub(cc->EvalMult(ct_d1x,ct_d2y), cc->EvalMult(ct_d1y,ct_d2x));
+    auto nx = cc->EvalSub(cc->EvalMult(d1y, d2z), cc->EvalMult(d1z, d2y));
+    auto ny = cc->EvalSub(cc->EvalMult(d1z, d2x), cc->EvalMult(d1x, d2z));
+    auto nz = cc->EvalSub(cc->EvalMult(d1x, d2y), cc->EvalMult(d1y, d2x));
 
-    // ── Produit mixte w·n = (P2-P1)·(d1×d2) → coplanarité ──────────────────
-    auto ct_wx = cc->EvalSub(ct_p2x, ct_p1x);
-    auto ct_wy = cc->EvalSub(ct_p2y, ct_p1y);
-    auto ct_wz = cc->EvalSub(ct_p2z, ct_p1z);
-    auto ct_cop = cc->EvalAdd(
-        cc->EvalAdd(cc->EvalMult(ct_wx,ct_nx), cc->EvalMult(ct_wy,ct_ny)),
-        cc->EvalMult(ct_wz,ct_nz));
+    auto nx2 = cc->EvalMult(nx, nx);
+    auto ny2 = cc->EvalMult(ny, ny);
+    auto nz2 = cc->EvalMult(nz, nz);
 
-    // ── Orientations 2D sur le plan XY (une fois la coplanarité vérifiée) ───
-    // o1 = signe de l'orientation (P1Q1, P2)
-    auto ct_o1 = cc->EvalSub(
-        cc->EvalMult(ct_d1y, cc->EvalSub(ct_p2x,ct_q1x)),
-        cc->EvalMult(ct_d1x, cc->EvalSub(ct_p2y,ct_q1y)));
-    // o2 = signe de l'orientation (P1Q1, Q2)
-    auto ct_o2 = cc->EvalSub(
-        cc->EvalMult(ct_d1y, cc->EvalSub(ct_q2x,ct_q1x)),
-        cc->EvalMult(ct_d1x, cc->EvalSub(ct_q2y,ct_q1y)));
-    // o3 = signe de l'orientation (P2Q2, P1)
-    auto ct_o3 = cc->EvalSub(
-        cc->EvalMult(ct_d2y, cc->EvalSub(ct_p1x,ct_q2x)),
-        cc->EvalMult(ct_d2x, cc->EvalSub(ct_p1y,ct_q2y)));
-    // o4 = signe de l'orientation (P2Q2, Q1)
-    auto ct_o4 = cc->EvalSub(
-        cc->EvalMult(ct_d2y, cc->EvalSub(ct_q1x,ct_q2x)),
-        cc->EvalMult(ct_d2x, cc->EvalSub(ct_q1y,ct_q2y)));
+    auto wx = cc->EvalSub(p2x, p1x);
+    auto wy = cc->EvalSub(p2y, p1y);
+    auto wz = cc->EvalSub(p2z, p1z);
+
+    auto cop = cc->EvalAdd(
+        cc->EvalAdd(cc->EvalMult(wx, nx), cc->EvalMult(wy, ny)),
+        cc->EvalMult(wz, nz)
+    );
+
+    auto orient = [&](const auto& ax, const auto& ay,
+                      const auto& bx, const auto& by,
+                      const auto& cx, const auto& cy) {
+        auto dy1 = cc->EvalSub(by, ay);
+        auto dx1 = cc->EvalSub(bx, ax);
+        auto dx2 = cc->EvalSub(cx, bx);
+        auto dy2 = cc->EvalSub(cy, by);
+
+        return cc->EvalSub(
+            cc->EvalMult(dy1, dx2),
+            cc->EvalMult(dx1, dy2)
+        );
+    };
+
+    // Plan XY = DROP_Z
+    auto o1_xy = orient(p1x, p1y, q1x, q1y, p2x, p2y);
+    auto o2_xy = orient(p1x, p1y, q1x, q1y, q2x, q2y);
+    auto o3_xy = orient(p2x, p2y, q2x, q2y, p1x, p1y);
+    auto o4_xy = orient(p2x, p2y, q2x, q2y, q1x, q1y);
+
+    // Plan XZ = DROP_Y
+    auto o1_xz = orient(p1x, p1z, q1x, q1z, p2x, p2z);
+    auto o2_xz = orient(p1x, p1z, q1x, q1z, q2x, q2z);
+    auto o3_xz = orient(p2x, p2z, q2x, q2z, p1x, p1z);
+    auto o4_xz = orient(p2x, p2z, q2x, q2z, q1x, q1z);
+
+    // Plan YZ = DROP_X
+    auto o1_yz = orient(p1y, p1z, q1y, q1z, p2y, p2z);
+    auto o2_yz = orient(p1y, p1z, q1y, q1z, q2y, q2z);
+    auto o3_yz = orient(p2y, p2z, q2y, q2z, p1y, p1z);
+    auto o4_yz = orient(p2y, p2z, q2y, q2z, q1y, q1z);
+
+    auto p12_xy = cc->EvalMult(o1_xy, o2_xy);
+    auto p34_xy = cc->EvalMult(o3_xy, o4_xy);
+
+    auto p12_xz = cc->EvalMult(o1_xz, o2_xz);
+    auto p34_xz = cc->EvalMult(o3_xz, o4_xz);
+
+    auto p12_yz = cc->EvalMult(o1_yz, o2_yz);
+    auto p34_yz = cc->EvalMult(o3_yz, o4_yz);
+
+    writeFile(out_pref + "_cop.bin",    serializeCiphertext(cop));
+
+    writeFile(out_pref + "_nx2.bin",    serializeCiphertext(nx2));
+    writeFile(out_pref + "_ny2.bin",    serializeCiphertext(ny2));
+    writeFile(out_pref + "_nz2.bin",    serializeCiphertext(nz2));
+
+    writeFile(out_pref + "_p12_xy.bin", serializeCiphertext(p12_xy));
+    writeFile(out_pref + "_p34_xy.bin", serializeCiphertext(p34_xy));
+
+    writeFile(out_pref + "_p12_xz.bin", serializeCiphertext(p12_xz));
+    writeFile(out_pref + "_p34_xz.bin", serializeCiphertext(p34_xz));
+
+    writeFile(out_pref + "_p12_yz.bin", serializeCiphertext(p12_yz));
+    writeFile(out_pref + "_p34_yz.bin", serializeCiphertext(p34_yz));
 
     auto t1 = std::chrono::high_resolution_clock::now();
-    double ms = std::chrono::duration<double,std::milli>(t1-t0).count();
+    double ms = std::chrono::duration<double,std::milli>(t1 - t0).count();
 
-    // ── Écriture des ciphertexts de résultat ─────────────────────────────────
-    // Bob n'a PAS sk_Alice → il écrit les ciphertexts chiffrés pour Alice
-    writeFile(out_pref + "_cop.bin", serializeCiphertext(ct_cop));
-    writeFile(out_pref + "_o1.bin",  serializeCiphertext(ct_o1));
-    writeFile(out_pref + "_o2.bin",  serializeCiphertext(ct_o2));
-    writeFile(out_pref + "_o3.bin",  serializeCiphertext(ct_o3));
-    writeFile(out_pref + "_o4.bin",  serializeCiphertext(ct_o4));
-
-    std::cout << "[detect_enc] 5 ciphertexts de résultat écrits (" 
+    std::cout << "[detect_enc] 10 ciphertexts 3D ecrits avec drop axis implicite ("
               << std::fixed << std::setprecision(0) << ms << " ms)\n";
     std::cout << "CT_RESULT_PREFIX:" << out_pref << "\n";
     std::cout.flush();
+
     return 0;
 }
-
 // ══════════════════════════════════════════════════════════════════════════════
 // MODE DECRYPT_RESULT (NOUVEAU) — Alice côté
 //
@@ -582,8 +615,6 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
     std::string emk_file = args.count("--emk") ? args.at("--emk") : "emk.bin";
     std::string ct_pref  = args.count("--ct")  ? args.at("--ct")  : "ct_result";
 
-    // ── Charger le contexte CKKS d'Alice ─────────────────────────────────────
-    std::cout << "[decrypt_ss] Chargement contexte Alice...\n"; std::cout.flush();
     auto cc = deserializeContext(readFile(ctx_file));
     deserializeEvalMultKeys(cc, readFile(emk_file));
     auto sk = deserializeSecretKey(readFile(sk_file));
@@ -593,7 +624,6 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
     aliceKeys.secretKey = sk;
     aliceKeys.publicKey = pk;
 
-    // ── Injecter le contexte d'Alice dans l'engine ────────────────────────────
     CryptoEngine engine;
     CryptoEngine::Config config;
     config.batchSize = 64;
@@ -601,71 +631,110 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
     config.logQ_ccLWE = 25;
 
     engine.loadContext(cc, aliceKeys, config);
-
-    // ── Recréer le scheme switching avec sk_Alice ─────────────────────────────
-    std::cout << "[decrypt_ss] Reconstruction scheme switching...\n"; std::cout.flush();
     engine.setupSchemeSwitching();
 
-    // ── Charger les 5 ciphertexts de Bob ─────────────────────────────────────
     auto loadCt = [&](const std::string& s) {
         return deserializeCiphertext(readFile(ct_pref + s + ".bin"));
     };
-    auto ct_cop = loadCt("_cop");
-    auto ct_o1  = loadCt("_o1");
-    auto ct_o2  = loadCt("_o2");
-    auto ct_o3  = loadCt("_o3");
-    auto ct_o4  = loadCt("_o4");
 
-    std::cout << "[decrypt_ss] Scheme switching en cours...\n"; std::cout.flush();
+    auto ct_cop = loadCt("_cop");
+
+    auto nx2 = loadCt("_nx2");
+    auto ny2 = loadCt("_ny2");
+    auto nz2 = loadCt("_nz2");
+
+    auto p12_xy = loadCt("_p12_xy");
+    auto p34_xy = loadCt("_p34_xy");
+
+    auto p12_xz = loadCt("_p12_xz");
+    auto p34_xz = loadCt("_p34_xz");
+
+    auto p12_yz = loadCt("_p12_yz");
+    auto p34_yz = loadCt("_p34_yz");
+
+    std::cout << "[decrypt_ss] Choix drop axis + comparaisons...\n";
+    std::cout.flush();
+
     auto t0 = std::chrono::high_resolution_clock::now();
 
-    // ── Étape 1 : Coplanarité — 2 scheme switches ─────────────────────────────
-    // Si les segments ne sont pas coplanaires (altitudes différentes),
-    // on s'arrête ici → 2 SS seulement, pas de collision possible
+    // 1) Coplanarité : 2 SS
     auto ct_copOK = engine.isNearZeroBand(ct_cop, 1.0);
     double copVal = engine.decryptValue(ct_copOK);
     bool coplanar = (copVal > 0.5);
 
-    auto t1 = std::chrono::high_resolution_clock::now();
-    double ms = std::chrono::duration<double,std::milli>(t1-t0).count();
-
     if (!coplanar) {
+        auto t1 = std::chrono::high_resolution_clock::now();
+        double ms = std::chrono::duration<double,std::milli>(t1 - t0).count();
+
         std::cout << "[decrypt_ss] LIBRE — non coplanaire"
                   << " (" << std::fixed << std::setprecision(0) << ms << " ms, 2 SS)\n";
         std::cout << "JSON_RESULT:{\"collision\":false"
                   << ",\"scheme_switches\":2"
-                  << ",\"total_time_ms\":"  << std::fixed << std::setprecision(1) << ms
+                  << ",\"total_time_ms\":" << std::fixed << std::setprecision(1) << ms
                   << "}\n";
-        std::cout.flush();
         return 0;
     }
 
-    // ── Étape 2 : Orientations — 4 scheme switches supplémentaires ───────────
-    // On arrive ici seulement si les segments sont coplanaires
-    auto ct_s1 = engine.compareGreaterThanZero(ct_o1);
-    auto ct_s2 = engine.compareGreaterThanZero(ct_o2);
-    auto ct_s3 = engine.compareGreaterThanZero(ct_o3);
-    auto ct_s4 = engine.compareGreaterThanZero(ct_o4);
+    // 2) Choix du drop axis : 2 SS
+    // bxy = 1 si nx² > ny²
+    auto bxy = engine.compareGreaterThanZero(cc->EvalSub(nx2, ny2));
+    auto one = engine.oneLike(bxy);
+    auto not_bxy = engine.eNot(bxy);
 
-    // Logique booléenne chiffrée
-    auto ct_xor12 = engine.eXor(ct_s1, ct_s2);
-    auto ct_xor34 = engine.eXor(ct_s3, ct_s4);
-    auto ct_inter = engine.eAnd(ct_xor12, ct_xor34);
-    auto ct_final = engine.eAnd(ct_copOK, ct_inter);
+    auto max_xy = cc->EvalAdd(
+        cc->EvalMult(bxy, nx2),
+        cc->EvalMult(not_bxy, ny2)
+    );
 
-    double result  = engine.decryptValue(ct_final);
+    // bxyz = 1 si max(nx²,ny²) > nz²
+    auto bxyz = engine.compareGreaterThanZero(cc->EvalSub(max_xy, nz2));
+    auto not_bxyz = engine.eNot(bxyz);
+
+    // chooseX = DROP_X => plan YZ
+    // chooseY = DROP_Y => plan XZ
+    // chooseZ = DROP_Z => plan XY
+    auto chooseX = cc->EvalMult(bxyz, bxy);
+    auto chooseY = cc->EvalMult(bxyz, not_bxy);
+    auto chooseZ = not_bxyz;
+
+    // 3) Sélection chiffrée du bon p12/p34
+    auto p12 = cc->EvalAdd(
+        cc->EvalAdd(
+            cc->EvalMult(chooseX, p12_yz),
+            cc->EvalMult(chooseY, p12_xz)
+        ),
+        cc->EvalMult(chooseZ, p12_xy)
+    );
+
+    auto p34 = cc->EvalAdd(
+        cc->EvalAdd(
+            cc->EvalMult(chooseX, p34_yz),
+            cc->EvalMult(chooseY, p34_xz)
+        ),
+        cc->EvalMult(chooseZ, p34_xy)
+    );
+
+    // 4) Intersection 2D du bon plan : 2 SS
+    auto opp12 = engine.ltZero(p12);
+    auto opp34 = engine.ltZero(p34);
+
+    auto inter2D = engine.eAnd(opp12, opp34);
+    auto finalCt = engine.eAnd(ct_copOK, inter2D);
+
+    double result = engine.decryptValue(finalCt);
     bool collision = (result > 0.5);
 
     auto t2 = std::chrono::high_resolution_clock::now();
-    ms = std::chrono::duration<double,std::milli>(t2-t0).count();
+    double ms = std::chrono::duration<double,std::milli>(t2 - t0).count();
 
     std::cout << "[decrypt_ss] " << (collision ? "COLLISION" : "LIBRE")
               << " (" << std::fixed << std::setprecision(0) << ms << " ms, 6 SS)\n";
-    std::cout << "JSON_RESULT:{\"collision\":"  << (collision ? "true" : "false")
+
+    std::cout << "JSON_RESULT:{\"collision\":" << (collision ? "true" : "false")
               << ",\"scheme_switches\":6"
-              << ",\"total_time_ms\":"          << std::fixed << std::setprecision(1) << ms
+              << ",\"total_time_ms\":" << std::fixed << std::setprecision(1) << ms
               << "}\n";
-    std::cout.flush();
+
     return 0;
 }
 

@@ -27,14 +27,8 @@ ALICE_HOST  = "127.0.0.1"
 ALICE_PORT  = 9001
 
 BOB_TRAJ = [
-    # CORRECTION BUG #3 : z variable pour exercer la géométrie 3D
-    # Bob descend de z=50 vers z=30 (altitude d'Alice) au point de croisement,
-    # puis remonte. Les segments 7-9 sont à z=30 → collision 3D réelle.
-    # Les segments 1-6 sont à altitude différente → pas de collision même si
-    # les projections 2D se rapprochent.
-    (100,0,50),(98,6,48),(95,13,45),(90,20,42),(83,26,38),(75,33,35),
-    (65,40,32),(55,46,30),(44,53,30),(34,60,30),
-    (25,66,32),(16,73,35),(9,80,38),(4,86,42),(1,93,46),(0,100,50)
+    (0, 100, 30),
+    (100, 0, 30)
 ]
 
 SUFFIXES = ["_p1x","_p1y","_p1z","_q1x","_q1y","_q1z"]
@@ -148,26 +142,32 @@ def main():
         ms = (time.time() - t0) * 1000
         print(f"[Bob] Calcul terminé ({ms:.0f} ms) — ciphertexts prêts pour Alice")
 
-        # Lire les 5 ciphertexts de résultat
-        result_suffixes = ["_cop", "_o1", "_o2", "_o3", "_o4"]
+        # Lire les 10 ciphertexts de résultat
+        RESULT_SUFFIXES = [
+            "_cop",
+            "_nx2", "_ny2", "_nz2",
+            "_p12_xy", "_p34_xy",
+            "_p12_xz", "_p34_xz",
+            "_p12_yz", "_p34_yz"
+        ]
         result_cts = {}
-        for s in result_suffixes:
+        for s in RESULT_SUFFIXES:
             result_cts[s] = read_file(f_ct_res + s + ".bin")
-        print(f"[Bob] 5 ciphertexts de résultat lus ({len(result_cts['_cop'])/1024:.1f} KB chacun)")
+        print(f"[Bob] 10 ciphertexts de résultat lus ({len(result_cts['_cop'])/1024:.1f} KB chacun)")
 
         # CORRECTION BUG #2 : Bob envoie les ciphertexts chiffrés, JAMAIS sa position GPS
         # La position de Bob reste confidentielle — Alice déchiffrera avec sa clé secrète
         send_data(sock, str(seg).encode())           # signal de segment
-        for s in result_suffixes:
+        for s in RESULT_SUFFIXES:
             send_data(sock, result_cts[s])           # 5 ciphertexts (≈ 5× taille d'un ct)
-        print(f"[Bob] 5 ct_result envoyés à Alice (position Bob non révélée)")
+        print(f"[Bob] 10 ct_result envoyés à Alice (position Bob non révélée)")
 
         # Nettoyage
         for s in SUFFIXES:
             for pref in [f_ct_alice, f_ct_bob]:
                 try: os.unlink(pref + s + ".bin")
                 except: pass
-        for s in result_suffixes:
+        for s in RESULT_SUFFIXES:
             try: os.unlink(f_ct_res + s + ".bin")
             except: pass
         try: os.unlink(f_bob_path)

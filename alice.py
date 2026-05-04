@@ -28,23 +28,22 @@ BINARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", 
 STATE_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "drone_state.json")
 ALICE_PORT  = 9001
 
-# CORRECTION BUG #3 : trajectoires avec z variable
-# Alice : altitude constante z=30 (drone de référence)
 ALICE_TRAJ = [
-    (0,50,30),(6,54,-30),(13,58,99),(20,61,0),(26,64,90),
-    (33,67,30),(40,69,30),(46,69,30),(53,69,30),(60,69,30),
-    (66,67,30),(73,64,30),(80,61,30),(86,58,30),(93,54,30),(100,50,30)
+    (0, 0, 30),
+    (100, 100, 30)
 ]
-# Bob : descend de z=50 vers z=30 au croisement (segments 7-9), puis remonte
-# → Les segments 1-6 sont à altitude différente : pas de collision 3D malgré
-#   croisement apparent en 2D. Les segments 7-9 à z=30 : collision réelle.
 BOB_TRAJ = [
-    (100,0,2),(98,6,48),(95,13,-25),(90,20,90),(83,26,38),(75,33,35),
-    (65,40,32),(55,46,30),(44,53,30),(34,60,30),
-    (25,66,32),(16,73,35),(9,80,38),(4,86,42),(1,93,46),(0,100,50)
+    (0, 100, 30),
+    (100, 0, 30)
 ]
 
-RESULT_SUFFIXES = ["_cop", "_o1", "_o2", "_o3", "_o4"]
+RESULT_SUFFIXES = [
+    "_cop",
+    "_nx2", "_ny2", "_nz2",
+    "_p12_xy", "_p34_xy",
+    "_p12_xz", "_p34_xz",
+    "_p12_yz", "_p34_yz"
+]
 
 # ── Helpers socket ────────────────────────────────────────────────────────────
 def send_data(s, data):
@@ -205,7 +204,7 @@ def main():
         for s in RESULT_SUFFIXES:
             data = recv_data(conn)
             write_file(f_ct_res + s + ".bin", data)
-        print(f"[Alice] 5 ciphertexts de résultat reçus de Bob")
+        print(f"[Alice] 10 ciphertexts de résultat reçus de Bob")
 
         # Déchiffrement + scheme switching côté Alice avec ses propres clés
         t0 = time.time()
