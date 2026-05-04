@@ -60,15 +60,15 @@ target_link_libraries(test_geometry_clear
     OpenMP::OpenMP_CXX
 )
 
-# ─── Test 2 : oracle FHE vs clair ─────────────────────────────────────────────
-add_executable(test_fhe_oracle
+# ─── Test 2 : validation FHE vs clair ─────────────────────────────────────────
+add_executable(test_fhe_validation
     src/engine.cpp
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    tests/test_fhe_oracle.cpp
+    tests/test_fhe_validation.cpp
 )
-target_link_libraries(test_fhe_oracle
+target_link_libraries(test_fhe_validation
     ${OpenFHE_LIBRARIES}
     OpenMP::OpenMP_CXX
 )

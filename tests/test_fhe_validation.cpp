@@ -1,5 +1,5 @@
 /**
- * test_fhe_oracle.cpp
+ * test_fhe_validation.cpp
  * ===================
  * Test de cohérence FHE vs clair.
  *
@@ -11,8 +11,8 @@
  * Cela valide que le protocole chiffré ne produit pas de faux positifs
  * ni de faux négatifs par rapport à la référence en clair.
  *
- * Compile : cmake --build build --target test_fhe_oracle
- * Run     : ./build/test_fhe_oracle [nb_paires]   (défaut : 20)
+ * Compile : cmake --build build --target test_fhe_validation
+ * Run     : ./build/test_fhe_validation [nb_paires]   (défaut : 20)
  *
  * AVERTISSEMENT : l'initialisation FHE prend ~60 s (keygen + scheme switching).
  * Le test lui-même (N paires) est rapide ensuite.
@@ -103,7 +103,7 @@ static std::vector<FixedCase> fixed_cases()
         // Dans batchCheckIntersection3D, le code parallèle vérifie
         // p1.z != q1.z pour détecter les segments non horizontaux et leur attribue
         // cops=9999 (non coplanaire) → faux négatif.
-        // On utilise CHECK_KNOWN_LIMIT pour ce cas (voir run_fixed_oracle).
+        // On utilise CHECK_KNOWN_LIMIT pour ce cas (voir run_fixed_validation).
         { mk(0,0,0,10,10,10), mk(0,0,0,10,10,10), true,
           "Segments identiques (superposés, diagonaux)" },
         // diagonales scénario 1
@@ -115,11 +115,11 @@ static std::vector<FixedCase> fixed_cases()
     };
 }
 
-// ─── test oracle aléatoire ───────────────────────────────────────────────────
-static void run_random_oracle(GeometryEngine &geo,
+// ─── test validation aléatoire ───────────────────────────────────────────────────
+static void run_random_validation(GeometryEngine &geo,
                                int N, unsigned seed)
 {
-    std::cout << "\n=== Oracle aléatoire : " << N
+    std::cout << "\n=== Validation aléatoire : " << N
               << " paires (seed=" << seed << ") ===\n";
 
     std::mt19937 rng(seed);
@@ -175,10 +175,10 @@ static void run_random_oracle(GeometryEngine &geo,
           "Cohérence totale FHE == clair sur " + std::to_string(N) + " paires aléatoires");
 }
 
-// ─── test oracle sur scénarios fixes ─────────────────────────────────────────
-static void run_fixed_oracle(GeometryEngine &geo)
+// ─── test validation sur scénarios fixes ─────────────────────────────────────────
+static void run_fixed_validation(GeometryEngine &geo)
 {
-    std::cout << "\n=== Oracle scénarios fixes ===\n";
+    std::cout << "\n=== Validation scénarios fixes ===\n";
 
     for (const auto &tc : fixed_cases())
     {
@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
     if (N < 1)    N = 1;
 
     std::cout << "========================================\n";
-    std::cout << "  Test oracle FHE vs clair              \n";
+    std::cout << "  Test validation FHE vs clair              \n";
     std::cout << "========================================\n";
 
     // ── Initialisation du moteur FHE ────────────────────────────────────────
@@ -234,8 +234,8 @@ int main(int argc, char *argv[])
     GeometryEngine geo(&engine);
 
     // ── Tests ────────────────────────────────────────────────────────────────
-    run_fixed_oracle(geo);
-    run_random_oracle(geo, N, /*seed=*/42);
+    run_fixed_validation(geo);
+    run_random_validation(geo, N, /*seed=*/42);
 
     // ── Résumé ───────────────────────────────────────────────────────────────
     std::cout << "\n========================================\n";

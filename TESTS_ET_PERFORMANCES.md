@@ -12,7 +12,7 @@
 1. [Objectifs de la phase de tests](#1-objectifs)
 2. [Architecture des tests](#2-architecture)
 3. [Test 1 — Unitaires géométrie en clair](#3-test-1--unitaires-géométrie-en-clair)
-4. [Test 2 — Oracle FHE vs clair](#4-test-2--oracle-fhe-vs-clair)
+4. [Test 2 — Validation FHE vs clair](#4-test-2--validation-fhe-vs-clair)
 5. [Test 3 — Benchmark de scalabilité](#5-test-3--benchmark-de-scalabilité)
 6. [Courbes de performance](#6-courbes-de-performance)
 7. [Résumé global des résultats](#7-résumé-global)
@@ -39,7 +39,7 @@ La phase de tests vise trois objectifs distincts :
 projet/
 ├── tests/
 │   ├── test_geometry_clear.cpp        ← Test 1 : unitaires en clair (sans FHE)
-│   ├── test_fhe_oracle.cpp            ← Test 2 : oracle FHE vs clair
+│   ├── test_fhe_validation.cpp            ← Test 2 : validation FHE vs clair
 │   ├── test_benchmark_scalability.cpp ← Test 3 : benchmark scalabilité
 │   └── plot_scalability.py            ← Script Python : génère les courbes PNG
 ├── results/
@@ -53,7 +53,7 @@ projet/
 ```bash
 cmake -S . -B build
 cmake --build build --target test_geometry_clear        # ~10 s
-cmake --build build --target test_fhe_oracle            # ~10 s
+cmake --build build --target test_fhe_validation            # ~10 s
 cmake --build build --target test_benchmark_scalability # ~10 s
 ```
 
@@ -181,15 +181,15 @@ Fonctions testées :
 
 ---
 
-## 4. Test 2 — Oracle FHE vs clair
+## 4. Test 2 — Validation FHE vs clair
 
 ### 4.1 Fichier
-`tests/test_fhe_oracle.cpp`  
-Binaire : `./build/test_fhe_oracle [nb_paires]`
+`tests/test_fhe_validation.cpp`  
+Binaire : `./build/test_fhe_validation [nb_paires]`
 
 ### 4.2 Principe
 
-L'oracle test est le test de **cohérence** entre le protocole chiffré et la référence en clair. Pour chaque paire de segments testée :
+L'validation test est le test de **cohérence** entre le protocole chiffré et la référence en clair. Pour chaque paire de segments testée :
 
 1. On calcule le résultat **en clair** avec `doSegmentsIntersectClear3D` → réponse exacte booléenne
 2. On calcule le résultat **en FHE** avec `batchCheckIntersection3D` → valeur approchée dans [0, 1]
@@ -243,7 +243,7 @@ Faux négatifs FHE    : 0
 
 ```
 ========================================
-  Test oracle FHE vs clair
+  Test validation FHE vs clair
 ========================================
 
 === Oracle scénarios fixes ===
@@ -408,8 +408,8 @@ python3 tests/plot_scalability.py
 | Test | Nb cas | Résultat | Taux de réussite |
 |---|---|---|---|
 | Unitaires géométrie en clair | 26 | 26 PASS | **100%** |
-| Oracle FHE — scénarios fixes | 7 | 6 PASS + 1 LIMIT | **100%** (hors limitation connue) |
-| Oracle FHE — aléatoire (N=20) | 20 | 20 accord | **100%** |
+| Validation FHE — scénarios fixes | 7 | 6 PASS + 1 LIMIT | **100%** (hors limitation connue) |
+| Validation FHE — aléatoire (N=20) | 20 | 20 accord | **100%** |
 | Faux positifs FHE | — | 0 | — |
 | Faux négatifs FHE | — | 0 | — |
 
@@ -494,7 +494,7 @@ cmake .. && make -j$(nproc) && sudo make install
 cd Detection-de-collisions-3D-de-drones-avec-chiffrement-homomorphe-batching
 cmake -S . -B build
 cmake --build build --target test_geometry_clear
-cmake --build build --target test_fhe_oracle
+cmake --build build --target test_fhe_validation
 cmake --build build --target test_benchmark_scalability
 ```
 
@@ -504,9 +504,9 @@ cmake --build build --target test_benchmark_scalability
 # Test 1 — géométrie en clair (~2 secondes)
 ./build/test_geometry_clear
 
-# Test 2 — oracle FHE vs clair (~1 minute)
-./build/test_fhe_oracle          # 20 paires aléatoires
-./build/test_fhe_oracle 100      # 100 paires pour plus de confiance
+# Test 2 — validation FHE vs clair (~1 minute)
+./build/test_fhe_validation          # 20 paires aléatoires
+./build/test_fhe_validation 100      # 100 paires pour plus de confiance
 
 # Test 3 — benchmark scalabilité (~5-10 minutes)
 ./build/test_benchmark_scalability
@@ -522,6 +522,6 @@ python3 tests/plot_scalability.py
 | Commande | Résultat attendu |
 |---|---|
 | `./build/test_geometry_clear` | `Résultat : 26/26 tests passés` |
-| `./build/test_fhe_oracle` | `Résultat : 7/7 tests passés` + `100.0%` accord aléatoire |
+| `./build/test_fhe_validation` | `Résultat : 7/7 tests passés` + `100.0%` accord aléatoire |
 | `./build/test_benchmark_scalability` | Tableau avec SS batch = 2 constant, gain ×97 à N=50 |
 | `python3 tests/plot_scalability.py` | `Courbes sauvegardées : results/scalability.png` |
