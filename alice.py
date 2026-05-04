@@ -85,6 +85,7 @@ def pts_to_str(pts):
 def write_state(state):
     with open(STATE_FILE, "w") as f:
         json.dump(state, f)
+        
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
@@ -196,7 +197,7 @@ def main():
             send_data(conn, alice_cts[s])
         print(f"[Alice] 6 ct_alice envoyés à Bob")
 
-        # ── CORRECTION BUG #1 : Recevoir les 5 ciphertexts de résultat de Bob ──
+        # ── CORRECTION BUG #1 : Recevoir les 10 ciphertexts de résultat de Bob ──
         # Bob envoie les résultats CHIFFRÉS — Alice les déchiffre avec sa sk
         # (plus de JSON en clair avec position GPS de Bob)
         _ = recv_data(conn)   # signal de segment de Bob (ignoré, on connaît le nôtre)

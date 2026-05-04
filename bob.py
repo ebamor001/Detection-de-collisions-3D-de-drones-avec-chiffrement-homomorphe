@@ -22,6 +22,10 @@ CORRECTIONS APPORTÉES :
 
 import socket, struct, subprocess, tempfile, os, json, time
 
+
+MAX_REQUESTS = 5
+
+
 BINARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "drone_fhe")
 ALICE_HOST  = "127.0.0.1"
 ALICE_PORT  = 9001
@@ -98,11 +102,25 @@ def main():
     write_file(emk_file, emk_data)
 
     n = len(BOB_TRAJ) - 1
+    request_count = 0
+    last_seg = 0
+
     for seg in range(1, n + 1):
 
         # Signal d'Alice + reception des 6 ciphertexts d'Alice
         seg_signal = recv_data(sock).decode()
         print(f"\n[Bob] === Segment {seg_signal} signal par Alice ===")
+
+        request_count += 1
+
+        if request_count > MAX_REQUESTS:
+            raise RuntimeError("[SECURITY] Trop de requêtes Alice — session bloquée")
+
+        seg_recv = int(seg_signal)
+        if seg_recv != last_seg + 1:
+            raise RuntimeError("[SECURITY] Requête incohérente — ordre des segments invalide")
+
+        last_seg = seg_recv
 
         # Recevoir les 6 ct_alice
         f_ct_alice = tempfile.NamedTemporaryFile(suffix="_ct_alice", delete=False).name
@@ -117,7 +135,7 @@ def main():
 
         f_bob_path = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False).name
         f_ct_bob   = tempfile.NamedTemporaryFile(suffix="_ct_bob", delete=False).name
-        # CORRECTION BUG #1 : préfixe pour les 5 ciphertexts de résultat
+        # CORRECTION BUG #1 : préfixe pour les 10 ciphertexts de résultat
         f_ct_res   = tempfile.NamedTemporaryFile(suffix="_ct_result", delete=False).name
 
         with open(f_bob_path, 'w') as f:
@@ -129,7 +147,7 @@ def main():
         print(f"[Bob] 6 ct_bob générés avec pk_alice")
 
         # CORRECTION BUG #1 : Calcul FHE sans déchiffrement côté Bob
-        # detect_encrypted écrit 5 ciphertexts résultat (cop, o1..o4)
+        # detect_encrypted écrit 10 ciphertexts résultat (cop, o1..o4)
         # que seule Alice peut déchiffrer avec sa clé secrète
         print("[Bob] Calcul FHE detect_encrypted (sans déchiffrement)...")
         t0 = time.time()
@@ -159,7 +177,7 @@ def main():
         # La position de Bob reste confidentielle — Alice déchiffrera avec sa clé secrète
         send_data(sock, str(seg).encode())           # signal de segment
         for s in RESULT_SUFFIXES:
-            send_data(sock, result_cts[s])           # 5 ciphertexts (≈ 5× taille d'un ct)
+            send_data(sock, result_cts[s])           # 10 ciphertexts (≈ 10× taille d'un ct)
         print(f"[Bob] 10 ct_result envoyés à Alice (position Bob non révélée)")
 
         # Nettoyage

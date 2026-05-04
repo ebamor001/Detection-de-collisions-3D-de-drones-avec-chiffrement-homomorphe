@@ -8,7 +8,6 @@
  *   ./drone_fhe --mode init    --ctx ctx.bin --pk pk.bin --emk emk.bin --esk esk.bin
  *   ./drone_fhe --mode keygen  --ctx ctx.bin --pk pk_out.bin
  *   ./drone_fhe --mode encrypt --ctx ctx.bin --pk pk.bin --path traj.txt --out ct.bin
- *   ./drone_fhe --mode detect  --ctx ctx.bin --ct1 ct1.bin --ct2 ct2.bin
  */
 
 #include <iostream>
