@@ -9,7 +9,7 @@ Protocole corrigé :
   4. Bob chiffre sa trajectoire avec pk_alice → 6 ciphertexts
   5. Bob appelle --mode detect_encrypted
      Calcul FHE complet avec le contexte d'Alice — JAMAIS de déchiffrement côté Bob
-  6. Bob envoie les 5 ciphertexts de résultat (ct_cop, ct_o1..o4) à Alice
+  6. Bob envoie les 10 ciphertexts de résultat ("_cop","_nx2", "_ny2", "_nz2","_p12_xy", "_p34_xy","_p12_xz", "_p34_xz","_p12_yz", "_p34_yz") à Alice
   7. Alice déchiffre avec SA clé secrète et prend la décision
 
 CORRECTIONS APPORTÉES :

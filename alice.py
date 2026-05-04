@@ -8,7 +8,7 @@ Protocole corrigé :
   3. Alice chiffre sa trajectoire avec sa pk → 6 ciphertexts
   4. Alice envoie les 6 ct_alice à Bob
   5. Bob chiffre sa trajectoire avec pk_alice, calcule detect_encrypted
-     → produit 5 ciphertexts de résultat (cop, o1..o4) SANS déchiffrer
+     → produit 10 ciphertexts de résultat ("_cop","_nx2", "_ny2", "_nz2","_p12_xy", "_p34_xy","_p12_xz", "_p34_xz","_p12_yz", "_p34_yz") SANS déchiffrer
   6. Bob envoie les 5 ct_result à Alice
   7. Alice appelle decrypt_result avec SA clé secrète → décision de collision
 
