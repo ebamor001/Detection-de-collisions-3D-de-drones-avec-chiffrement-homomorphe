@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""
+bob.py — Drone Bob  (version CORRIGÉE)
+
+Protocole corrigé :
+  1. Alice génère pk + sk
+  2. Alice chiffre sa trajectoire avec pk_alice → 6 ciphertexts
+  3. Alice envoie les 6 ct_alice + ctx + emk à Bob
+  4. Bob chiffre sa trajectoire avec pk_alice → 6 ciphertexts
+  5. Bob appelle --mode detect_encrypted
+     Calcul FHE complet avec le contexte d'Alice — JAMAIS de déchiffrement côté Bob
+  6. Bob envoie les 5 ciphertexts de résultat (ct_cop, ct_o1..o4) à Alice
+  7. Alice déchiffre avec SA clé secrète et prend la décision
+
+CORRECTIONS APPORTÉES :
+  - Bug #1 : Bob n'appelle plus engine.decryptValue() avec un engine aux mauvaises clés.
+             Il envoie les ciphertexts chiffrés à Alice pour déchiffrement.
+  - Bug #2 : Bob ne révèle plus sa position GPS en clair dans le réseau.
+             (suppression de "pos" et "seg" du JSON envoyé à Alice)
+  - Bug #3 : Trajectoires avec altitude z variable pour tester la géométrie 3D.
+"""
+
+import socket, struct, subprocess, tempfile, os, json, time
+
+BINARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build", "drone_fhe")
+ALICE_HOST  = "127.0.0.1"
+ALICE_PORT  = 9001
+
+BOB_TRAJ = [
+    # CORRECTION BUG #3 : z variable pour exercer la géométrie 3D
+    # Bob descend de z=50 vers z=30 (altitude d'Alice) au point de croisement,
+    # puis remonte. Les segments 7-9 sont à z=30 → collision 3D réelle.
+    # Les segments 1-6 sont à altitude différente → pas de collision même si
+    # les projections 2D se rapprochent.
+    (100,0,50),(98,6,48),(95,13,45),(90,20,42),(83,26,38),(75,33,35),
+    (65,40,32),(55,46,30),(44,53,30),(34,60,30),
+    (25,66,32),(16,73,35),(9,80,38),(4,86,42),(1,93,46),(0,100,50)
+]
+
+SUFFIXES = ["_p1x","_p1y","_p1z","_q1x","_q1y","_q1z"]
+
+def send_data(s, data):
+    s.sendall(struct.pack(">I", len(data)) + data)
+
+def recv_data(s):
+    n = struct.unpack(">I", _exact(s, 4))[0]
+    return _exact(s, n)
+
+def _exact(s, n):
+    buf = b""
+    while len(buf) < n:
+        c = s.recv(n - len(buf))
+        if not c: raise ConnectionError("Socket fermee")
+        buf += c
+    return buf
+
+def write_file(path, data):
+    with open(path, "wb") as f: f.write(data)
+
+def read_file(path):
+    with open(path, "rb") as f: return f.read()
+
+def run(cmd, timeout=600):
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr[:300])
+    return r.stdout
+
+def pts_to_str(pts):
+    return "".join(f"({x},{y},{z})" for x,y,z in pts)
+
+def main():
+    print("=" * 55)
+    print("  BOB — Drone 2 (calcul FHE sur ciphertexts)")
+    print("=" * 55)
+
+    sock = None
+    for attempt in range(15):
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((ALICE_HOST, ALICE_PORT))
+            break
+        except ConnectionRefusedError:
+            print(f"[Bob] Alice pas prete, attente... ({attempt+1}/15)")
+            time.sleep(2)
+            sock = None
+
+    if sock is None:
+        raise RuntimeError("Impossible de se connecter a Alice")
+    print("[Bob] Connecte a Alice")
+
+    # Recevoir contexte + clés d'Alice (CORRECTION : plus d'esk)
+    ctx_data = recv_data(sock)
+    pk_data  = recv_data(sock)
+    emk_data = recv_data(sock)
+    print(f"[Bob] Contexte : {len(ctx_data)/1024:.1f} KB | PK Alice : {len(pk_data)/1024:.1f} KB")
+
+    ctx_file = tempfile.NamedTemporaryFile(suffix="_ctx.bin", delete=False).name
+    pk_file  = tempfile.NamedTemporaryFile(suffix="_pk.bin",  delete=False).name
+    emk_file = tempfile.NamedTemporaryFile(suffix="_emk.bin", delete=False).name
+
+    write_file(ctx_file, ctx_data)
+    write_file(pk_file,  pk_data)
+    write_file(emk_file, emk_data)
+
+    n = len(BOB_TRAJ) - 1
+    for seg in range(1, n + 1):
+
+        # Signal d'Alice + reception des 6 ciphertexts d'Alice
+        seg_signal = recv_data(sock).decode()
+        print(f"\n[Bob] === Segment {seg_signal} signal par Alice ===")
+
+        # Recevoir les 6 ct_alice
+        f_ct_alice = tempfile.NamedTemporaryFile(suffix="_ct_alice", delete=False).name
+        for s in SUFFIXES:
+            data = recv_data(sock)
+            write_file(f_ct_alice + s + ".bin", data)
+        print(f"[Bob] 6 ct_alice recus")
+
+        # Chiffrer le segment de Bob avec pk_alice (6 ciphertexts)
+        seg_bob = [BOB_TRAJ[seg-1], BOB_TRAJ[seg]]
+        print(f"[Bob] Segment : {seg_bob[0]} -> {seg_bob[1]}")
+
+        f_bob_path = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False).name
+        f_ct_bob   = tempfile.NamedTemporaryFile(suffix="_ct_bob", delete=False).name
+        # CORRECTION BUG #1 : préfixe pour les 5 ciphertexts de résultat
+        f_ct_res   = tempfile.NamedTemporaryFile(suffix="_ct_result", delete=False).name
+
+        with open(f_bob_path, 'w') as f:
+            f.write(pts_to_str(seg_bob) + "\n")
+
+        run([BINARY_PATH, "--mode", "encrypt",
+             "--ctx", ctx_file, "--pk", pk_file,
+             "--path", f_bob_path, "--out", f_ct_bob])
+        print(f"[Bob] 6 ct_bob générés avec pk_alice")
+
+        # CORRECTION BUG #1 : Calcul FHE sans déchiffrement côté Bob
+        # detect_encrypted écrit 5 ciphertexts résultat (cop, o1..o4)
+        # que seule Alice peut déchiffrer avec sa clé secrète
+        print("[Bob] Calcul FHE detect_encrypted (sans déchiffrement)...")
+        t0 = time.time()
+        run([BINARY_PATH, "--mode", "detect_encrypted",
+             "--ctx", ctx_file,
+             "--emk", emk_file,
+             "--ct1", f_ct_alice,
+             "--ct2", f_ct_bob,
+             "--out", f_ct_res])   # ← 5 fichiers ct_result_*.bin générés
+        ms = (time.time() - t0) * 1000
+        print(f"[Bob] Calcul terminé ({ms:.0f} ms) — ciphertexts prêts pour Alice")
+
+        # Lire les 5 ciphertexts de résultat
+        result_suffixes = ["_cop", "_o1", "_o2", "_o3", "_o4"]
+        result_cts = {}
+        for s in result_suffixes:
+            result_cts[s] = read_file(f_ct_res + s + ".bin")
+        print(f"[Bob] 5 ciphertexts de résultat lus ({len(result_cts['_cop'])/1024:.1f} KB chacun)")
+
+        # CORRECTION BUG #2 : Bob envoie les ciphertexts chiffrés, JAMAIS sa position GPS
+        # La position de Bob reste confidentielle — Alice déchiffrera avec sa clé secrète
+        send_data(sock, str(seg).encode())           # signal de segment
+        for s in result_suffixes:
+            send_data(sock, result_cts[s])           # 5 ciphertexts (≈ 5× taille d'un ct)
+        print(f"[Bob] 5 ct_result envoyés à Alice (position Bob non révélée)")
+
+        # Nettoyage
+        for s in SUFFIXES:
+            for pref in [f_ct_alice, f_ct_bob]:
+                try: os.unlink(pref + s + ".bin")
+                except: pass
+        for s in result_suffixes:
+            try: os.unlink(f_ct_res + s + ".bin")
+            except: pass
+        try: os.unlink(f_bob_path)
+        except: pass
+
+    print("\n[Bob] Simulation terminée.")
+    sock.close()
+    for f in [ctx_file, pk_file, emk_file]:
+        try: os.unlink(f)
+        except: pass
+
+if __name__ == "__main__":
+    main()
