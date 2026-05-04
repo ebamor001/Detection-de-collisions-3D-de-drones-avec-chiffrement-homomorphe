@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
         CryptoEngine::Config config;
         // Valeurs réduites pour la démo — switchValues=4096 rendrait setupSchemeSwitching très lent (>5 min)
         config.batchSize    = 64;
-        config.switchValues = 64;
+        config.switchValues = 16;
         config.logQ_ccLWE   = 25;
 
         if (!json_mode) std::cout << "[*] Initializing CryptoEngine...\n";

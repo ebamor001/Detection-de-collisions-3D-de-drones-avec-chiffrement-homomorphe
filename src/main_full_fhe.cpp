@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
         CryptoEngine engine;
         CryptoEngine::Config config;
         config.batchSize = 64;
-        config.switchValues = 64;
+        config.switchValues = 16;
         config.logQ_ccLWE = 25;
 
         engine.initialize(config);

@@ -87,8 +87,19 @@ bool GeometryEngine::doSegmentsIntersectClear3D(const Segment& s1, const Segment
     long ny = d1z*d2x - d1x*d2z;
     long nz = d1x*d2y - d1y*d2x;
     if (nx==0 && ny==0 && nz==0) {
-        // segments parallèles -> on peut projeter sur XY par défaut
-        return doSegmentsIntersectClear2D(s1, s2, GeometryEngine::DROP_Z);
+        long wx0 = p2.x - p1.x;
+        long wy0 = p2.y - p1.y;
+        long wz0 = p2.z - p1.z;
+
+        long cx = wy0*d1z - wz0*d1y;
+        long cy = wz0*d1x - wx0*d1z;
+        long cz = wx0*d1y - wy0*d1x;
+
+        if (cx != 0 || cy != 0 || cz != 0)
+            return false;
+
+        DropAxis drop = chooseDropAxisFromNormal(d1x, d1y, d1z);
+        return doSegmentsIntersectClear2D(s1, s2, drop);
     }
 
     // coplanarity: (p2-p1)·n == 0
@@ -280,13 +291,26 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3D(
     long nz = d1x*d2y - d1y*d2x;
     //si les 2 segments sont //
     if (nx==0 && ny==0 && nz==0) {
-        if (p1.z != q1.z || p1.z != p2.z || p1.z != q2.z) {
-           return engine->encryptValue(0.0); //pas de collisions si pas meme altitude
+        // segments parallèles : vérifier colinéarité réelle
+
+        long wx0 = p2.x - p1.x;
+        long wy0 = p2.y - p1.y;
+        long wz0 = p2.z - p1.z;
+
+        long cx = wy0*d1z - wz0*d1y;
+        long cy = wz0*d1x - wx0*d1z;
+        long cz = wx0*d1y - wy0*d1x;
+
+        // parallèles mais PAS sur la même droite
+        if (cx != 0 || cy != 0 || cz != 0) {
+            return engine->encryptValue(0.0);
         }
-        return checkSegmentIntersection2D(s1, s2, GeometryEngine::DROP_Z);
+
+        // colinéaires → projection 2D
+        DropAxis drop = chooseDropAxisFromNormal(d1x, d1y, d1z);
+        return checkSegmentIntersection2D(s1, s2, drop);
     }
 
-    //cas non // 
     //calcul du produit mixte
     DropAxis drop = chooseDropAxisFromNormal(nx, ny, nz);
     long wx=p2.x-p1.x, wy=p2.y-p1.y, wz=p2.z-p1.z;
@@ -303,21 +327,6 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3D(
     return engine->eAnd(copOK, inter2D);
 }
 
-// Version batchee de checkSegmentIntersection3D.
-// Au lieu de tester 1 paire a la fois (N appels = N*8 scheme switches),
-// on teste N paires en parallele (1 appel = 6 scheme switches quel que soit N).
-//
-// Fonctionnement :
-//   1. Cross product en clair pour chaque paire (gratuit, pas de chiffrement)
-//   2. Packer les N produits mixtes dans 1 ciphertext → test coplanarite batche (2 SS)
-//   3. Grouper les paires par axe de projection (drop X, Y ou Z)
-//   4. Pour chaque groupe, packer les 4 orientations → 4 scheme switches pour le groupe
-//   5. Logique booleenne XOR + AND (CKKS pur, 0 SS)
-//   6. Combiner avec le resultat de coplanarite
-//
-// Resultat : un vecteur de doubles, 1 valeur par voisin.
-//   > 0.5 = collision, < 0.5 = pas de collision.
-
 std::vector<double> GeometryEngine::batchCheckIntersection3D(
     const Segment& mySeg,
     const std::vector<Segment>& neighbors)
@@ -328,195 +337,231 @@ std::vector<double> GeometryEngine::batchCheckIntersection3D(
     const auto& p1 = mySeg.first;
     const auto& q1 = mySeg.second;
 
-    // direction de mon segment (en clair, c'est MON segment)
-    long d1x = q1.x - p1.x, d1y = q1.y - p1.y, d1z = q1.z - p1.z;
+    long d1x = q1.x - p1.x;
+    long d1y = q1.y - p1.y;
+    long d1z = q1.z - p1.z;
 
-    // etape 1 : cross product et produit mixte en clair pour chaque paire
-    // c'est gratuit car on calcule sur des long, pas sur des ciphertexts
-    std::vector<double> cops(N);         // produit mixte de chaque paire
-    std::vector<DropAxis> drops(N);      // axe a drop pour la projection 2D
-    std::vector<bool> isParallel(N, false);
+    std::vector<double> results(N, 0.0);
+    std::vector<DropAxis> drops(N, DROP_Z);
+    std::vector<int> candidates;
+    std::vector<int> collinear_group;
 
     for (int i = 0; i < N; i++) {
         const auto& p2 = neighbors[i].first;
         const auto& q2 = neighbors[i].second;
 
-        // direction du segment voisin
-        long d2x = q2.x - p2.x, d2y = q2.y - p2.y, d2z = q2.z - p2.z;
+        long d2x = q2.x - p2.x;
+        long d2y = q2.y - p2.y;
+        long d2z = q2.z - p2.z;
 
-        // produit vectoriel n = d1 x d2
         long nx = d1y*d2z - d1z*d2y;
         long ny = d1z*d2x - d1x*d2z;
         long nz = d1x*d2y - d1y*d2x;
 
         if (nx == 0 && ny == 0 && nz == 0) {
-            // segments paralleles
-            isParallel[i] = true;
-            drops[i] = DROP_Z;
-            // si pas meme altitude → pas de collision possible
-            if (p1.z != q1.z || p1.z != p2.z || p1.z != q2.z) {
-                cops[i] = 9999.0;  // valeur non-zero → isNearZero dira "non coplanaire"
-            } else {
-                cops[i] = 0.0;     // meme altitude → coplanaires
+            long wx0 = p2.x - p1.x;
+            long wy0 = p2.y - p1.y;
+            long wz0 = p2.z - p1.z;
+
+            long cx = wy0*d1z - wz0*d1y;
+            long cy = wz0*d1x - wx0*d1z;
+            long cz = wx0*d1y - wy0*d1x;
+
+            if (cx == 0 && cy == 0 && cz == 0) {
+                collinear_group.push_back(i);
+                drops[i] = chooseDropAxisFromNormal(d1x, d1y, d1z);
             }
         } else {
-            // produit mixte : (p2-p1) . n
-            long wx = p2.x - p1.x, wy = p2.y - p1.y, wz = p2.z - p1.z;
-            cops[i] = double(wx*nx + wy*ny + wz*nz);
-            drops[i] = chooseDropAxisFromNormal(nx, ny, nz);
+            long wx = p2.x - p1.x;
+            long wy = p2.y - p1.y;
+            long wz = p2.z - p1.z;
+
+            long cop = wx*nx + wy*ny + wz*nz;
+
+            if (cop == 0) {
+                candidates.push_back(i);
+                drops[i] = chooseDropAxisFromNormal(nx, ny, nz);
+            }
         }
     }
 
-    // etape 2 : coplanarite batchee
-    // on packe les N produits mixtes dans 1 ciphertext
-    // isNearZeroBand fait 2 scheme switches pour les N valeurs en parallele
-    // avant batching : N appels a isNearZeroBand = 2N scheme switches
-    // apres batching : 1 appel = 2 scheme switches
-    auto ct_cops = engine->encryptVector(cops);
-    auto ct_copOK = engine->isNearZeroBand(ct_cops, 1e-5);
-    bootstrapCount += 2;
+    if (candidates.empty() && collinear_group.empty())
+        return results;
 
-    // lire les resultats de coplanarite pour savoir quelles paires garder
-    auto copResults = engine->decryptVector(ct_copOK, N);
-
-    // etape 3 : grouper par axe de projection
-    // les paires non coplanaires sont deja eliminees (copResults[i] < 0.5)
-    // les paires restantes sont groupees par axe pour le batch 2D
     std::vector<int> groupZ, groupX, groupY;
-    for (int i = 0; i < N; i++) {
-        if (copResults[i] < 0.5) continue;  // pas coplanaire → pas de collision
-        if (drops[i] == DROP_Z) groupZ.push_back(i);
-        else if (drops[i] == DROP_X) groupX.push_back(i);
-        else groupY.push_back(i);
+
+    for (int idx : candidates) {
+        if (drops[idx] == DROP_Z) groupZ.push_back(idx);
+        else if (drops[idx] == DROP_X) groupX.push_back(idx);
+        else groupY.push_back(idx);
     }
 
-    // vecteur de resultats finaux (initialise a 0 = pas de collision)
-    std::vector<double> results(N, 0.0);
+    int maxCap = (int)engine->getCompareSlots();
 
-    // etape 4 : pour chaque groupe, batch des 4 orientations 2D
-    // cette lambda traite un groupe de paires qui ont le meme axe de projection
     auto processGroup = [&](const std::vector<int>& group, DropAxis drop) {
         if (group.empty()) return;
+
         int K = (int)group.size();
 
-        // projeter mon segment sur le plan 2D (en clair)
         auto [p1a, p1b] = project2D(p1, drop);
         auto [q1a, q1b] = project2D(q1, drop);
-        double dy1 = double(q1b - p1b);  // direction de mon segment projete
+
+        double dy1 = double(q1b - p1b);
         double dx1 = double(q1a - p1a);
 
-        // pour chaque orientation, on prepare un vecteur de K valeurs
-        // chaque slot = les coordonnees d'un voisin different
-        std::vector<double> dy1_vec(K, dy1);   // moi replique K fois
-        std::vector<double> dx1_vec(K, dx1);   // moi replique K fois
+        for (int start = 0; start < K; start += maxCap) {
+            int end = std::min(K, start + maxCap);
+            int Kc = end - start;
 
-        // o1 = orient(P1,Q1,P2) : dx2 = P2a - Q1a, dy2 = P2b - Q1b
-        std::vector<double> dx2_o1(K), dy2_o1(K);
-        // o2 = orient(P1,Q1,Q2) : dx2 = Q2a - Q1a, dy2 = Q2b - Q1b
-        std::vector<double> dx2_o2(K), dy2_o2(K);
-        // o3 et o4 utilisent la direction du segment voisin
-        std::vector<double> dy_seg2(K), dx_seg2(K);
-        // o3 = orient(P2,Q2,P1) : dx2 = P1a - Q2a, dy2 = P1b - Q2b
-        std::vector<double> dx2_o3(K), dy2_o3(K);
-        // o4 = orient(P2,Q2,Q1) : dx2 = Q1a - Q2a, dy2 = Q1b - Q2b
-        std::vector<double> dx2_o4(K), dy2_o4(K);
+            std::vector<double> dy1_vec(Kc, dy1);
+            std::vector<double> dx1_vec(Kc, dx1);
 
-        for (int j = 0; j < K; j++) {
-            int idx = group[j];
-            auto [p2a, p2b] = project2D(neighbors[idx].first, drop);
-            auto [q2a, q2b] = project2D(neighbors[idx].second, drop);
+            std::vector<double> dx2_o1(Kc), dy2_o1(Kc);
+            std::vector<double> dx2_o2(Kc), dy2_o2(Kc);
+            std::vector<double> dy_seg2(Kc), dx_seg2(Kc);
+            std::vector<double> dx2_o3(Kc), dy2_o3(Kc);
+            std::vector<double> dx2_o4(Kc), dy2_o4(Kc);
 
-            // o1 : orient(P1,Q1,P2)
-            dx2_o1[j] = double(p2a - q1a);
-            dy2_o1[j] = double(p2b - q1b);
+            for (int j = 0; j < Kc; j++) {
+                int idx = group[start + j];
 
-            // o2 : orient(P1,Q1,Q2)
-            dx2_o2[j] = double(q2a - q1a);
-            dy2_o2[j] = double(q2b - q1b);
+                auto [p2a, p2b] = project2D(neighbors[idx].first, drop);
+                auto [q2a, q2b] = project2D(neighbors[idx].second, drop);
 
-            // direction du segment voisin (pour o3 et o4)
-            dy_seg2[j] = double(q2b - p2b);
-            dx_seg2[j] = double(q2a - p2a);
+                dx2_o1[j] = double(p2a - q1a);
+                dy2_o1[j] = double(p2b - q1b);
 
-            // o3 : orient(P2,Q2,P1)
-            dx2_o3[j] = double(p1a - q2a);
-            dy2_o3[j] = double(p1b - q2b);
+                dx2_o2[j] = double(q2a - q1a);
+                dy2_o2[j] = double(q2b - q1b);
 
-            // o4 : orient(P2,Q2,Q1)
-            dx2_o4[j] = double(q1a - q2a);
-            dy2_o4[j] = double(q1b - q2b);
+                dy_seg2[j] = double(q2b - p2b);
+                dx_seg2[j] = double(q2a - p2a);
+
+                dx2_o3[j] = double(p1a - q2a);
+                dy2_o3[j] = double(p1b - q2b);
+
+                dx2_o4[j] = double(q1a - q2a);
+                dy2_o4[j] = double(q1b - q2b);
+            }
+
+            auto ct_dy1 = engine->encryptVector(dy1_vec);
+            auto ct_dx1 = engine->encryptVector(dx1_vec);
+
+            auto ct_o1 = engine->sub(
+                engine->mult(ct_dy1, engine->encryptVector(dx2_o1)),
+                engine->mult(ct_dx1, engine->encryptVector(dy2_o1))
+            );
+
+            auto ct_o2 = engine->sub(
+                engine->mult(ct_dy1, engine->encryptVector(dx2_o2)),
+                engine->mult(ct_dx1, engine->encryptVector(dy2_o2))
+            );
+
+            auto ct_dy_s2 = engine->encryptVector(dy_seg2);
+            auto ct_dx_s2 = engine->encryptVector(dx_seg2);
+
+            auto ct_o3 = engine->sub(
+                engine->mult(ct_dy_s2, engine->encryptVector(dx2_o3)),
+                engine->mult(ct_dx_s2, engine->encryptVector(dy2_o3))
+            );
+
+            auto ct_o4 = engine->sub(
+                engine->mult(ct_dy_s2, engine->encryptVector(dx2_o4)),
+                engine->mult(ct_dx_s2, engine->encryptVector(dy2_o4))
+            );
+
+            orientationComputations += 4 * Kc;
+
+            auto ct_s1 = engine->compareGtZeroPacked(ct_o1, Kc);
+            auto ct_s2 = engine->compareGtZeroPacked(ct_o2, Kc);
+            auto ct_s3 = engine->compareGtZeroPacked(ct_o3, Kc);
+            auto ct_s4 = engine->compareGtZeroPacked(ct_o4, Kc);
+
+            bootstrapCount += 4;
+            signExtractions += 4;
+
+            auto ct_xor12 = engine->eXor(ct_s1, ct_s2);
+            auto ct_xor34 = engine->eXor(ct_s3, ct_s4);
+
+            auto ct_inter = engine->eAnd(ct_xor12, ct_xor34);
+
+            auto interResults = engine->decryptVector(ct_inter, Kc);
+
+            for (int j = 0; j < Kc; j++)
+                results[group[start + j]] = interResults[j];
+
+            intersectionTests += Kc;
         }
-
-        // chiffrer : 1 ciphertext par vecteur
-        // mon segment est replique (meme valeur dans tous les slots)
-        // les voisins sont packes (valeur differente par slot)
-        auto ct_dy1 = engine->encryptVector(dy1_vec);
-        auto ct_dx1 = engine->encryptVector(dx1_vec);
-
-        // orientation 1 : orient(P1,Q1,P2) = dy1*dx2 - dx1*dy2
-        // avant batching : 1 encryptValue + 1 mult + 1 mult + 1 sub par paire
-        // apres batching : 1 encryptVector + 1 mult + 1 mult + 1 sub pour K paires
-        auto ct_o1 = engine->sub(
-            engine->mult(ct_dy1, engine->encryptVector(dx2_o1)),
-            engine->mult(ct_dx1, engine->encryptVector(dy2_o1)));
-
-        // orientation 2 : orient(P1,Q1,Q2)
-        auto ct_o2 = engine->sub(
-            engine->mult(ct_dy1, engine->encryptVector(dx2_o2)),
-            engine->mult(ct_dx1, engine->encryptVector(dy2_o2)));
-
-        // orientation 3 : orient(P2,Q2,P1) - utilise la direction du segment voisin
-        auto ct_dy_s2 = engine->encryptVector(dy_seg2);
-        auto ct_dx_s2 = engine->encryptVector(dx_seg2);
-
-        auto ct_o3 = engine->sub(
-            engine->mult(ct_dy_s2, engine->encryptVector(dx2_o3)),
-            engine->mult(ct_dx_s2, engine->encryptVector(dy2_o3)));
-
-        // orientation 4 : orient(P2,Q2,Q1)
-        auto ct_o4 = engine->sub(
-            engine->mult(ct_dy_s2, engine->encryptVector(dx2_o4)),
-            engine->mult(ct_dx_s2, engine->encryptVector(dy2_o4)));
-
-        orientationComputations += 4 * K;
-
-        // produit des orientations
-        auto ct_p12 = engine->mult(ct_o1, ct_o2);
-        auto ct_p34 = engine->mult(ct_o3, ct_o4);
-
-        // test signe du produit (2 scheme switches au lieu de 4)
-        auto ct_opp12 = engine->ltZero(ct_p12);
-        auto ct_opp34 = engine->ltZero(ct_p34);
-
-        bootstrapCount += 2;
-
-        // intersection si signes opposés
-        auto ct_inter = engine->eAnd(ct_opp12, ct_opp34);
-
-        // lire les resultats et les stocker
-        auto interResults = engine->decryptVector(ct_inter, K);
-        for (int j = 0; j < K; j++) {
-            results[group[j]] = interResults[j];
-        }
-
-        intersectionTests += K;
     };
 
-    // traiter chaque groupe
     processGroup(groupZ, DROP_Z);
     processGroup(groupX, DROP_X);
     processGroup(groupY, DROP_Y);
 
-    // combiner avec la coplanarite : resultat final = copOK AND inter2D
-    // les paires non coplanaires sont deja a 0 dans results
-    // les paires coplanaires ont le resultat du test 2D
-    // pas besoin d'un AND chiffre ici car on a deja filtre en clair
+    if (!collinear_group.empty()) {
+        int K = (int)collinear_group.size();
+
+        long d1d1 = d1x*d1x + d1y*d1y + d1z*d1z;
+
+        for (int start = 0; start < K; start += maxCap) {
+            int end = std::min(K, start + maxCap);
+            int Kc = end - start;
+
+            std::vector<double> wp_vec(Kc);
+            std::vector<double> wq_vec(Kc);
+            std::vector<double> d1d1_vec(Kc, double(d1d1));
+
+            for (int j = 0; j < Kc; j++) {
+                int idx = collinear_group[start + j];
+
+                const auto& p2 = neighbors[idx].first;
+                const auto& q2 = neighbors[idx].second;
+
+                wp_vec[j] = double(
+                    (p2.x - p1.x)*d1x +
+                    (p2.y - p1.y)*d1y +
+                    (p2.z - p1.z)*d1z
+                );
+
+                wq_vec[j] = double(
+                    (q2.x - p1.x)*d1x +
+                    (q2.y - p1.y)*d1y +
+                    (q2.z - p1.z)*d1z
+                );
+            }
+
+            auto ct_wp = engine->encryptVector(wp_vec);
+            auto ct_wq = engine->encryptVector(wq_vec);
+            auto ct_d1d1 = engine->encryptVector(d1d1_vec);
+
+            auto lt_wp = engine->compareGtZeroPacked(engine->negate(ct_wp), Kc);
+            auto lt_wq = engine->compareGtZeroPacked(engine->negate(ct_wq), Kc);
+
+            auto gt_wp = engine->compareGtZeroPacked(engine->sub(ct_wp, ct_d1d1), Kc);
+            auto gt_wq = engine->compareGtZeroPacked(engine->sub(ct_wq, ct_d1d1), Kc);
+
+            bootstrapCount += 4;
+            signExtractions += 4;
+
+            auto both_below = engine->eAnd(lt_wp, lt_wq);
+            auto both_above = engine->eAnd(gt_wp, gt_wq);
+
+            auto not_below = engine->eNot(both_below);
+            auto not_above = engine->eNot(both_above);
+
+            auto ct_overlap = engine->eAnd(not_below, not_above);
+
+            auto overlapResults = engine->decryptVector(ct_overlap, Kc);
+
+            for (int j = 0; j < Kc; j++)
+                results[collinear_group[start + j]] = overlapResults[j];
+
+            intersectionTests += Kc;
+        }
+    }
 
     return results;
 }
-
-
-
 
 
 

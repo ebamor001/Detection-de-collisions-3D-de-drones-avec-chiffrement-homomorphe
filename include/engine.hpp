@@ -41,7 +41,7 @@ public:
               logQ_ccLWE(21),
               scaleSign(64.0),
               guardGain(1e4),
-              switchValues(32) {}
+              switchValues(16) {}
     };
 
     CryptoEngine();
