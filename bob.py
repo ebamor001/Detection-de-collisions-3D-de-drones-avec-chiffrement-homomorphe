@@ -9,7 +9,7 @@ Protocole corrigé :
   4. Bob chiffre sa trajectoire avec pk_alice → 6 ciphertexts
   5. Bob appelle --mode detect_encrypted
      Calcul FHE complet avec le contexte d'Alice — JAMAIS de déchiffrement côté Bob
-  6. Bob envoie les 10 ciphertexts de résultat ("_cop","_nx2", "_ny2", "_nz2","_p12_xy", "_p34_xy","_p12_xz", "_p34_xz","_p12_yz", "_p34_yz") à Alice
+  6. Bob envoie les 22 ciphertexts de résultat ("_cop","_nx2", "_ny2", "_nz2","_p12_xy", "_p34_xy","_p12_xz", "_p34_xz","_p12_yz", "_p34_yz") à Alice
   7. Alice déchiffre avec SA clé secrète et prend la décision
 
 CORRECTIONS APPORTÉES :
@@ -135,7 +135,7 @@ def main():
 
         f_bob_path = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False).name
         f_ct_bob   = tempfile.NamedTemporaryFile(suffix="_ct_bob", delete=False).name
-        # CORRECTION BUG #1 : préfixe pour les 10 ciphertexts de résultat
+        # CORRECTION BUG #1 : préfixe pour les 22ciphertexts de résultat
         f_ct_res   = tempfile.NamedTemporaryFile(suffix="_ct_result", delete=False).name
 
         with open(f_bob_path, 'w') as f:
@@ -147,7 +147,7 @@ def main():
         print(f"[Bob] 6 ct_bob générés avec pk_alice")
 
         # CORRECTION BUG #1 : Calcul FHE sans déchiffrement côté Bob
-        # detect_encrypted écrit 10 ciphertexts résultat (cop, o1..o4)
+        # detect_encrypted écrit 22 ciphertexts résultat (cop, o1..o4)
         # que seule Alice peut déchiffrer avec sa clé secrète
         print("[Bob] Calcul FHE detect_encrypted (sans déchiffrement)...")
         t0 = time.time()
@@ -164,21 +164,26 @@ def main():
         RESULT_SUFFIXES = [
             "_cop",
             "_nx2", "_ny2", "_nz2",
+
             "_p12_xy", "_p34_xy",
             "_p12_xz", "_p34_xz",
-            "_p12_yz", "_p34_yz"
+            "_p12_yz", "_p34_yz",
+
+            "_o1_xy", "_o2_xy", "_o3_xy", "_o4_xy",
+            "_o1_xz", "_o2_xz", "_o3_xz", "_o4_xz",
+            "_o1_yz", "_o2_yz", "_o3_yz", "_o4_yz"
         ]
         result_cts = {}
         for s in RESULT_SUFFIXES:
             result_cts[s] = read_file(f_ct_res + s + ".bin")
-        print(f"[Bob] 10 ciphertexts de résultat lus ({len(result_cts['_cop'])/1024:.1f} KB chacun)")
+        print(f"[Bob] 22 ciphertexts de résultat lus ({len(result_cts['_cop'])/1024:.1f} KB chacun)")
 
         # CORRECTION BUG #2 : Bob envoie les ciphertexts chiffrés, JAMAIS sa position GPS
         # La position de Bob reste confidentielle — Alice déchiffrera avec sa clé secrète
         send_data(sock, str(seg).encode())           # signal de segment
         for s in RESULT_SUFFIXES:
             send_data(sock, result_cts[s])           # 10 ciphertexts (≈ 10× taille d'un ct)
-        print(f"[Bob] 10 ct_result envoyés à Alice (position Bob non révélée)")
+        print(f"[Bob] 22 ct_result envoyés à Alice (position Bob non révélée)")
 
         # Nettoyage
         for s in SUFFIXES:

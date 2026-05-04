@@ -40,9 +40,14 @@ BOB_TRAJ = [
 RESULT_SUFFIXES = [
     "_cop",
     "_nx2", "_ny2", "_nz2",
+
     "_p12_xy", "_p34_xy",
     "_p12_xz", "_p34_xz",
-    "_p12_yz", "_p34_yz"
+    "_p12_yz", "_p34_yz",
+
+    "_o1_xy", "_o2_xy", "_o3_xy", "_o4_xy",
+    "_o1_xz", "_o2_xz", "_o3_xz", "_o4_xz",
+    "_o1_yz", "_o2_yz", "_o3_yz", "_o4_yz"
 ]
 
 # ── Helpers socket ────────────────────────────────────────────────────────────
@@ -197,7 +202,7 @@ def main():
             send_data(conn, alice_cts[s])
         print(f"[Alice] 6 ct_alice envoyés à Bob")
 
-        # ── CORRECTION BUG #1 : Recevoir les 10 ciphertexts de résultat de Bob ──
+        # ── CORRECTION BUG #1 : Recevoir les 22 ciphertexts de résultat de Bob ──
         # Bob envoie les résultats CHIFFRÉS — Alice les déchiffre avec sa sk
         # (plus de JSON en clair avec position GPS de Bob)
         _ = recv_data(conn)   # signal de segment de Bob (ignoré, on connaît le nôtre)
@@ -205,7 +210,7 @@ def main():
         for s in RESULT_SUFFIXES:
             data = recv_data(conn)
             write_file(f_ct_res + s + ".bin", data)
-        print(f"[Alice] 10 ciphertexts de résultat reçus de Bob")
+        print(f"[Alice] 22 ciphertexts de résultat reçus de Bob")
 
         # Déchiffrement + scheme switching côté Alice avec ses propres clés
         t0 = time.time()

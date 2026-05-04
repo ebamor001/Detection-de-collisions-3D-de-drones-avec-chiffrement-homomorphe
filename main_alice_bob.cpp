@@ -420,10 +420,27 @@ static int modeDetectEncrypted(const std::map<std::string,std::string>& args) {
     writeFile(out_pref + "_p12_yz.bin", serializeCiphertext(p12_yz));
     writeFile(out_pref + "_p34_yz.bin", serializeCiphertext(p34_yz));
 
+
+    // Orientations brutes nécessaires pour détecter les cas colinéaires
+    writeFile(out_pref + "_o1_xy.bin", serializeCiphertext(o1_xy));
+    writeFile(out_pref + "_o2_xy.bin", serializeCiphertext(o2_xy));
+    writeFile(out_pref + "_o3_xy.bin", serializeCiphertext(o3_xy));
+    writeFile(out_pref + "_o4_xy.bin", serializeCiphertext(o4_xy));
+
+    writeFile(out_pref + "_o1_xz.bin", serializeCiphertext(o1_xz));
+    writeFile(out_pref + "_o2_xz.bin", serializeCiphertext(o2_xz));
+    writeFile(out_pref + "_o3_xz.bin", serializeCiphertext(o3_xz));
+    writeFile(out_pref + "_o4_xz.bin", serializeCiphertext(o4_xz));
+
+    writeFile(out_pref + "_o1_yz.bin", serializeCiphertext(o1_yz));
+    writeFile(out_pref + "_o2_yz.bin", serializeCiphertext(o2_yz));
+    writeFile(out_pref + "_o3_yz.bin", serializeCiphertext(o3_yz));
+    writeFile(out_pref + "_o4_yz.bin", serializeCiphertext(o4_yz));
+
     auto t1 = std::chrono::high_resolution_clock::now();
     double ms = std::chrono::duration<double,std::milli>(t1 - t0).count();
 
-    std::cout << "[detect_enc] 10 ciphertexts 3D ecrits avec drop axis implicite ("
+    std::cout << "[detect_enc] 22 ciphertexts 3D ecrits avec drop axis implicite ("
               << std::fixed << std::setprecision(0) << ms << " ms)\n";
     std::cout << "CT_RESULT_PREFIX:" << out_pref << "\n";
     std::cout.flush();
@@ -495,6 +512,21 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
     auto p12_yz = loadCt("_p12_yz");
     auto p34_yz = loadCt("_p34_yz");
 
+    auto o1_xy = loadCt("_o1_xy");
+    auto o2_xy = loadCt("_o2_xy");
+    auto o3_xy = loadCt("_o3_xy");
+    auto o4_xy = loadCt("_o4_xy");
+
+    auto o1_xz = loadCt("_o1_xz");
+    auto o2_xz = loadCt("_o2_xz");
+    auto o3_xz = loadCt("_o3_xz");
+    auto o4_xz = loadCt("_o4_xz");
+
+    auto o1_yz = loadCt("_o1_yz");
+    auto o2_yz = loadCt("_o2_yz");
+    auto o3_yz = loadCt("_o3_yz");
+    auto o4_yz = loadCt("_o4_yz");
+
     std::cout << "[decrypt_ss] Choix drop axis + comparaisons...\n";
     std::cout.flush();
 
@@ -557,11 +589,39 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
         cc->EvalMult(chooseZ, p34_xy)
     );
 
-    // 4) Intersection 2D du bon plan : 2 SS
+
+    auto selectByDrop = [&](const auto& yz, const auto& xz, const auto& xy) {
+        return cc->EvalAdd(
+            cc->EvalAdd(
+                cc->EvalMult(chooseX, yz),
+                cc->EvalMult(chooseY, xz)
+            ),
+            cc->EvalMult(chooseZ, xy)
+        );
+    };
+
+    auto o1 = selectByDrop(o1_yz, o1_xz, o1_xy);
+    auto o2 = selectByDrop(o2_yz, o2_xz, o2_xy);
+    auto o3 = selectByDrop(o3_yz, o3_xz, o3_xy);
+    auto o4 = selectByDrop(o4_yz, o4_xz, o4_xy);
+
+    // Cas général
     auto opp12 = engine.ltZero(p12);
     auto opp34 = engine.ltZero(p34);
+    auto generalInter = engine.eAnd(opp12, opp34);
 
-    auto inter2D = engine.eAnd(opp12, opp34);
+    // Cas colinéaire / tangent approximatif
+    auto z1 = engine.isNearZeroBand(o1, 1.0);
+    auto z2 = engine.isNearZeroBand(o2, 1.0);
+    auto z3 = engine.isNearZeroBand(o3, 1.0);
+    auto z4 = engine.isNearZeroBand(o4, 1.0);
+
+    auto colinearCase = engine.eOr(
+        engine.eOr(z1, z2),
+        engine.eOr(z3, z4)
+    );
+
+    auto inter2D = engine.eOr(generalInter, colinearCase);
     auto finalCt = engine.eAnd(ct_copOK, inter2D);
 
     double result = engine.decryptValue(finalCt);
@@ -571,10 +631,10 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
     double ms = std::chrono::duration<double,std::milli>(t2 - t0).count();
 
     std::cout << "[decrypt_ss] " << (collision ? "COLLISION" : "LIBRE")
-              << " (" << std::fixed << std::setprecision(0) << ms << " ms, 6 SS)\n";
+              << " (" << std::fixed << std::setprecision(0) << ms << " ms, 14 SS)\n";
 
     std::cout << "JSON_RESULT:{\"collision\":" << (collision ? "true" : "false")
-              << ",\"scheme_switches\":6"
+              << ",\"scheme_switches\":14"
               << ",\"total_time_ms\":" << std::fixed << std::setprecision(1) << ms
               << "}\n";
 

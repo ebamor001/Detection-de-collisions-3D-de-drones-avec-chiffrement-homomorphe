@@ -614,27 +614,15 @@ GeometryEngine::EncDropChoice GeometryEngine::chooseDropAxisEncrypted(
     return choice;
 }
 
-// ── Version chiffree de batchCheckIntersection3D ─────────────────────────────
-// Prend 6 ciphertexts [x1,y1,z1,x2,y2,z2] — un par drone
-// Fait tout le calcul sous FHE : produit vectoriel, produit mixte, orientations
-// Renvoie 1.0 si collision, 0.0 sinon
+
 CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted(
-    const CiphertextCKKS& p1x,
-    const CiphertextCKKS& p1y,
-    const CiphertextCKKS& p1z,
-    const CiphertextCKKS& q1x,
-    const CiphertextCKKS& q1y,
-    const CiphertextCKKS& q1z,
-    const CiphertextCKKS& p2x,
-    const CiphertextCKKS& p2y,
-    const CiphertextCKKS& p2z,
-    const CiphertextCKKS& q2x,
-    const CiphertextCKKS& q2y,
-    const CiphertextCKKS& q2z
+    const CiphertextCKKS& p1x, const CiphertextCKKS& p1y, const CiphertextCKKS& p1z,
+    const CiphertextCKKS& q1x, const CiphertextCKKS& q1y, const CiphertextCKKS& q1z,
+    const CiphertextCKKS& p2x, const CiphertextCKKS& p2y, const CiphertextCKKS& p2z,
+    const CiphertextCKKS& q2x, const CiphertextCKKS& q2y, const CiphertextCKKS& q2z
 ) {
     auto cc = engine->getCKKSContext();
 
-    // 1. Directions
     auto d1x = cc->EvalSub(q1x, p1x);
     auto d1y = cc->EvalSub(q1y, p1y);
     auto d1z = cc->EvalSub(q1z, p1z);
@@ -643,12 +631,10 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
     auto d2y = cc->EvalSub(q2y, p2y);
     auto d2z = cc->EvalSub(q2z, p2z);
 
-    // 2. Produit vectoriel n = d1 × d2
     auto nx = cc->EvalSub(cc->EvalMult(d1y, d2z), cc->EvalMult(d1z, d2y));
     auto ny = cc->EvalSub(cc->EvalMult(d1z, d2x), cc->EvalMult(d1x, d2z));
     auto nz = cc->EvalSub(cc->EvalMult(d1x, d2y), cc->EvalMult(d1y, d2x));
 
-    // 3. Choix chiffré du plan de projection
     auto dropChoice = chooseDropAxisEncrypted(nx, ny, nz);
 
     auto selectA = [&](const CiphertextCKKS& x,
@@ -656,10 +642,10 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
                        const CiphertextCKKS& z) {
         return cc->EvalAdd(
             cc->EvalAdd(
-                cc->EvalMult(dropChoice.chooseX, y), // DROP_X -> y
-                cc->EvalMult(dropChoice.chooseY, x)  // DROP_Y -> x
+                cc->EvalMult(dropChoice.chooseX, y),
+                cc->EvalMult(dropChoice.chooseY, x)
             ),
-            cc->EvalMult(dropChoice.chooseZ, x)      // DROP_Z -> x
+            cc->EvalMult(dropChoice.chooseZ, x)
         );
     };
 
@@ -668,10 +654,10 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
                        const CiphertextCKKS& z) {
         return cc->EvalAdd(
             cc->EvalAdd(
-                cc->EvalMult(dropChoice.chooseX, z), // DROP_X -> z
-                cc->EvalMult(dropChoice.chooseY, z)  // DROP_Y -> z
+                cc->EvalMult(dropChoice.chooseX, z),
+                cc->EvalMult(dropChoice.chooseY, z)
             ),
-            cc->EvalMult(dropChoice.chooseZ, y)      // DROP_Z -> y
+            cc->EvalMult(dropChoice.chooseZ, y)
         );
     };
 
@@ -685,7 +671,6 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
     auto q2a = selectA(q2x, q2y, q2z);
     auto q2b = selectB(q2x, q2y, q2z);
 
-    // 4. Produit mixte : cop = (P2 - P1) · n
     auto wx = cc->EvalSub(p2x, p1x);
     auto wy = cc->EvalSub(p2y, p1y);
     auto wz = cc->EvalSub(p2z, p1z);
@@ -701,7 +686,6 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
     auto copOK = engine->isNearZeroBand(cop, 1.0);
     bootstrapCount += 2;
 
-    // 5. Orientations 2D sur la projection choisie
     auto d1a = cc->EvalSub(q1a, p1a);
     auto d1b = cc->EvalSub(q1b, p1b);
 
@@ -730,8 +714,6 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
 
     orientationComputations += 4;
 
-    // 6. Cas général : signes opposés
-    // Intersection si o1*o2 < 0 ET o3*o4 < 0
     auto norm = engine->constLike(o1, 1.0 / 100000.0);
 
     auto p12 = cc->EvalMult(cc->EvalMult(o1, o2), norm);
@@ -741,14 +723,70 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
     auto opp34 = engine->ltZero(p34);
     bootstrapCount += 2;
 
-    auto inter2D = engine->eAnd(opp12, opp34);
+    auto generalInter = engine->eAnd(opp12, opp34);
 
-    // 7. Résultat final : coplanaire ET intersection 2D
+    auto nearZero = [&](const CiphertextCKKS& v) {
+        return engine->isNearZeroBand(v, 1.0);
+    };
+
+    auto z1 = nearZero(o1);
+    auto z2 = nearZero(o2);
+    auto z3 = nearZero(o3);
+    auto z4 = nearZero(o4);
+    bootstrapCount += 8;
+
+    auto onSegmentEnc = [&](const CiphertextCKKS& pa,
+                            const CiphertextCKKS& pb,
+                            const CiphertextCKKS& qa,
+                            const CiphertextCKKS& qb,
+                            const CiphertextCKKS& ra,
+                            const CiphertextCKKS& rb) {
+        auto ua = cc->EvalSub(ra, pa);
+        auto ub = cc->EvalSub(rb, pb);
+
+        auto va = cc->EvalSub(qa, pa);
+        auto vb = cc->EvalSub(qb, pb);
+
+        auto s = cc->EvalAdd(
+            cc->EvalMult(va, ua),
+            cc->EvalMult(vb, ub)
+        );
+
+        auto uu = cc->EvalAdd(
+            cc->EvalMult(ua, ua),
+            cc->EvalMult(ub, ub)
+        );
+
+        auto epsS = engine->constLike(s, 1e-5);
+        auto epsU = engine->constLike(uu, 1e-5);
+
+        auto term1 = cc->EvalAdd(s, epsS);
+        auto term2 = cc->EvalSub(cc->EvalAdd(uu, epsU), s);
+        auto prod = cc->EvalMult(term1, term2);
+
+        auto outside = engine->ltZero(prod);
+        auto one = engine->oneLike(outside);
+
+        return cc->EvalSub(one, outside);
+    };
+
+    auto on1 = onSegmentEnc(p1a, p1b, p2a, p2b, q1a, q1b);
+    auto on2 = onSegmentEnc(p1a, p1b, q2a, q2b, q1a, q1b);
+    auto on3 = onSegmentEnc(p2a, p2b, p1a, p1b, q2a, q2b);
+    auto on4 = onSegmentEnc(p2a, p2b, q1a, q1b, q2a, q2b);
+    bootstrapCount += 4;
+
+    auto collinearInter = engine->eOr(
+        engine->eOr(engine->eAnd(z1, on1), engine->eAnd(z2, on2)),
+        engine->eOr(engine->eAnd(z3, on3), engine->eAnd(z4, on4))
+    );
+
+    auto inter2D = engine->eOr(generalInter, collinearInter);
+
     intersectionTests++;
 
     return engine->eAnd(copOK, inter2D);
 }
-
 
 // ===== 3) Validation / stats =====
 
