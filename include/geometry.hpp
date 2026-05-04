@@ -50,8 +50,7 @@ public:
     // Résultat : ciphertext qui chiffre 1.0 si collision, 0.0 sinon.
     CiphertextCKKS checkSegmentIntersection3DEncrypted(
         const CiphertextCKKS &ctAlice,
-        const CiphertextCKKS &ctBob,
-        bool sameAltitude = false);
+        const CiphertextCKKS &ctBob);
 
     // nouveau : version batchee (N paires en parallele)
     std::vector<double> batchCheckIntersection3D(

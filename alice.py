@@ -4,7 +4,7 @@ alice.py — Drone Alice (serveur)
 
 Protocole corrige :
 - Alice attend Bob
-- Bob envoie ctx + pk  + emk + esk
+- Bob envoie ctx + pk  + emk + erk (cles de rotation)
 - Alice chiffre son segment avec pk_bob
 - Alice lance detect sur ct_alice et ct_bob
 - Alice renvoie le resultat chiffre a Bob
@@ -24,12 +24,8 @@ ALICE_PORT = 9001
 
 ALICE_TRAJ = [
     (0, 50, 30), (6, 54, 30)
-]
+    ]
 
-BOB_TRAJ = [
-    (100, 0, 30), (98, 6, 30), (95, 13, 30), (90, 20, 30), (83, 26, 30),
-    (75, 33, 30)
-]
 
 def send_data(sock, data):
     sock.sendall(struct.pack(">I", len(data)) + data)
@@ -106,7 +102,7 @@ def main():
     ctx_file = tempfile.NamedTemporaryFile(suffix="_ctx.bin", delete=False).name
     pk_bob_file = tempfile.NamedTemporaryFile(suffix="_pk_bob.bin", delete=False).name
     emk_bob_file = tempfile.NamedTemporaryFile(suffix="_emk_bob.bin", delete=False).name
-    esk_bob_file = tempfile.NamedTemporaryFile(suffix="_esk_bob.bin", delete=False).name
+    erk_bob_file = tempfile.NamedTemporaryFile(suffix="_erk_bob.bin", delete=False).name
     btk_bob_file = tempfile.NamedTemporaryFile(suffix="_btk_bob.bin", delete=False).name
     swkfc_bob_file = tempfile.NamedTemporaryFile(suffix="_swkfc_bob.bin", delete=False).name
     try:
@@ -121,18 +117,18 @@ def main():
 
         cpp_proc = None
         try:
-            print("[Alice] Reception de ctx + pk_bob + emk_bob + esk_bob + btk_bob + swkfc_bob...")
+            print("[Alice] Reception de ctx + pk_bob + emk_bob + erk_bob + btk_bob + swkfc_bob...")
             ctx_data = recv_data(conn)
             pk_bob_data = recv_data(conn)
             emk_bob_data = recv_data(conn)
-            esk_bob_data = recv_data(conn)
+            erk_bob_data = recv_data(conn)
             btk_bob_data = recv_data(conn)
             swkfc_bob_data = recv_data(conn)
 
             write_file(ctx_file, ctx_data)
             write_file(pk_bob_file, pk_bob_data)
             write_file(emk_bob_file, emk_bob_data)
-            write_file(esk_bob_file, esk_bob_data)
+            write_file(erk_bob_file, erk_bob_data)
             write_file(btk_bob_file, btk_bob_data)
             write_file(swkfc_bob_file, swkfc_bob_data)
 
@@ -148,7 +144,7 @@ def main():
 
             cpp_send(
                 cpp_proc,
-                f"LOAD_REMOTE {ctx_file} {pk_bob_file} {emk_bob_file} {esk_bob_file} {btk_bob_file} {swkfc_bob_file}"
+                f"LOAD_REMOTE {ctx_file} {pk_bob_file} {emk_bob_file} {erk_bob_file} {btk_bob_file} {swkfc_bob_file}"
             )
 
             print(f"[Alice] Contexte recu : {len(ctx_data)/1024:.1f} KB")
@@ -186,7 +182,7 @@ def main():
 
                     out = cpp_send(
                         cpp_proc,
-                        f"DETECT_PATH {f_alice_ct} {f_bob_ct} {f_result_ct} 0"
+                        f"DETECT_PATH {f_alice_ct} {f_bob_ct} {f_result_ct}"
                     )
 
                     ms_det = (time.time() - t_det) * 1000.0
@@ -234,7 +230,7 @@ def main():
 
     finally:
         
-        for path in [ctx_file, pk_bob_file, emk_bob_file, esk_bob_file, btk_bob_file, swkfc_bob_file]:
+        for path in [ctx_file, pk_bob_file, emk_bob_file, erk_bob_file, btk_bob_file, swkfc_bob_file]:
             try:
                 os.unlink(path)
             except OSError:

@@ -355,8 +355,7 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3D(
 // ===== 2bis) Version full encrypted : entree = 2 ciphertexts =====
 CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted(
     const CiphertextCKKS &ctAlice,
-    const CiphertextCKKS &ctBob,
-    bool sameAltitude)
+    const CiphertextCKKS &ctBob)
 {
     std::cout << "[geo] start encrypted 3D" << std::endl;
 
@@ -493,44 +492,36 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
     // full path uses it for both axis selection and the parallel case.
     auto interDropZ = encIntersect2D(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2);
 
-    CiphertextCKKS inter2D;
-    if (sameAltitude) {
-        // Segments are coplanar in XY: skip axis selection and interDropX/Y entirely.
-        std::cout << "[geo] same-altitude fast path: drop Z only" << std::endl;
-        inter2D = interDropZ;
-    } else {
-        // Dynamic axis selection via encrypted comparisons.
-        auto absnx = engine->mult(nx, nx);
-        auto absny = engine->mult(ny, ny);
-        auto absnz = engine->mult(nz, nz);
+    auto absnx = engine->mult(nx, nx);
+    auto absny = engine->mult(ny, ny);
+    auto absnz = engine->mult(nz, nz);
 
-        auto dropX = engine->eAnd(
-            engine->compareGE(absnx, absny),
-            engine->compareGE(absnx, absnz)
-        );
+    auto dropX = engine->eAnd(
+        engine->compareGE(absnx, absny),
+        engine->compareGE(absnx, absnz)
+    );
 
-        auto dropY = engine->eAnd(
-            engine->compareGE(absny, absnx),
-            engine->compareGE(absny, absnz)
-        );
+    auto dropY = engine->eAnd(
+        engine->compareGE(absny, absnx),
+        engine->compareGE(absny, absnz)
+    );
 
-        auto dropZ = engine->eAnd(
-            engine->eNot(dropX),
-            engine->eNot(dropY)
-        );
-        bootstrapCount += 6;
+    auto dropZ = engine->eAnd(
+        engine->eNot(dropX),
+        engine->eNot(dropY)
+    );
+    bootstrapCount += 6;
 
-        auto interDropX = encIntersect2D(ay1, az1, ay2, az2, by1, bz1, by2, bz2);
-        auto interDropY = encIntersect2D(ax1, az1, ax2, az2, bx1, bz1, bx2, bz2);
+    auto interDropX = encIntersect2D(ay1, az1, ay2, az2, by1, bz1, by2, bz2);
+    auto interDropY = encIntersect2D(ax1, az1, ax2, az2, bx1, bz1, bx2, bz2);
 
-        inter2D = engine->eOr(
-            engine->eOr(
-                engine->eAnd(dropX, interDropX),
-                engine->eAnd(dropY, interDropY)
-            ),
-            engine->eAnd(dropZ, interDropZ)
-        );
-    }
+    CiphertextCKKS inter2D = engine->eOr(
+        engine->eOr(
+            engine->eAnd(dropX, interDropX),
+            engine->eAnd(dropY, interDropY)
+        ),
+        engine->eAnd(dropZ, interDropZ)
+    );
 
     auto nonParallelCase = engine->eAnd(
         notParallelBit,
