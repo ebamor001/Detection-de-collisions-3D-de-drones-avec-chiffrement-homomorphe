@@ -71,15 +71,25 @@ target_link_libraries(test_geometry_clear
     OpenMP::OpenMP_CXX
 )
 
-add_executable(test_fhe_oracle
+add_executable(test_fhe_validation
     src/engine.cpp
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    tests/test_fhe_oracle.cpp
+    tests/test_fhe_validation.cpp
 )
 
-target_link_libraries(test_fhe_oracle
+target_link_libraries(test_fhe_validation
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
+)
+
+add_executable(test_bench_primitives
+    src/engine.cpp
+    tests/test_bench_primitives.cpp
+)
+
+target_link_libraries(test_bench_primitives
     ${OpenFHE_LIBRARIES}
     OpenMP::OpenMP_CXX
 )

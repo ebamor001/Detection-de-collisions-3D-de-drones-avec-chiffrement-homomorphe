@@ -219,6 +219,13 @@ CryptoEngine::CiphertextCKKS CryptoEngine::compareLE(const CiphertextCKKS& a,
     return cc->EvalSub(oneLike(gtResult), gtResult);
 }
 
+CryptoEngine::CiphertextCKKS CryptoEngine::compareLE(const CiphertextCKKS& x,
+                                                     double thr) {
+    checkSwitchingReady();
+    auto ct_thr = constLike(x, thr);
+    return compareLE(x, ct_thr);
+}
+
 CryptoEngine::CiphertextCKKS CryptoEngine::constLike(const CiphertextCKKS& ref, double c) {
     checkInitialized();
     auto z = cc->EvalSub(ref, ref);
