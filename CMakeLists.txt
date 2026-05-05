@@ -84,25 +84,25 @@ target_link_libraries(test_fhe_validation
     OpenMP::OpenMP_CXX
 )
 
-add_executable(test_bench_primitives
+add_executable(test_primitives
     src/engine.cpp
-    tests/test_bench_primitives.cpp
+    tests/test_primitives.cpp
 )
 
-target_link_libraries(test_bench_primitives
+target_link_libraries(test_primitives
     ${OpenFHE_LIBRARIES}
     OpenMP::OpenMP_CXX
 )
 
-add_executable(test_benchmark_scalability
+add_executable(test_scalability
     src/engine.cpp
     src/geometry.cpp
     src/intersection.cpp
     src/io.cpp
-    tests/test_benchmark_scalability.cpp
+    tests/test_scalability.cpp
 )
 
-target_link_libraries(test_benchmark_scalability
+target_link_libraries(test_scalability
     ${OpenFHE_LIBRARIES}
     OpenMP::OpenMP_CXX
 )
