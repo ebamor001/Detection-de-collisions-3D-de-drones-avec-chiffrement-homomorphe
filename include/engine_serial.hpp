@@ -63,8 +63,6 @@ inline Ciphertext<DCRTPoly> deserializeCiphertext(const std::string& data) {
     return ct;
 }
 
-#endif
-
 inline std::string serializeSecretKey(const PrivateKey<DCRTPoly>& sk) {
     std::ostringstream oss;
     Serial::Serialize(sk, oss, SerType::BINARY);
@@ -77,3 +75,5 @@ inline PrivateKey<DCRTPoly> deserializeSecretKey(const std::string& data) {
     Serial::Deserialize(sk, iss, SerType::BINARY);
     return sk;
 }
+
+#endif // ENGINE_SERIAL_HPP

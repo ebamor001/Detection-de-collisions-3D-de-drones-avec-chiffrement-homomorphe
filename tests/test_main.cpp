@@ -11,22 +11,22 @@ int main() {
         CryptoEngine engine;
         CryptoEngine::Config cfg;
 
+        cfg.multDepth    = 20;
+        cfg.scaleModSize = 50;
+        cfg.batchSize    = 4096;
+        cfg.ringDim      = 8192;
+        cfg.secLevel     = HEStd_NotSet;
+
+        // params TFHE (pour compare)
+        cfg.slBin      = STD128;
+        cfg.logQ_ccLWE = 25;
+        cfg.scaleSign  = 1.0;
+        cfg.guardGain  = 1.0;
+
         engine.initialize(cfg);
         engine.setupSchemeSwitching();
 
         GeometryEngine geom(&engine);
-        
-        cfg.multDepth = 20;
-        cfg.scaleModSize = 50;
-        cfg.batchSize = 4096;
-        cfg.ringDim = 8192;
-        cfg.secLevel = HEStd_NotSet;
-
-        // params TFHE (pour compare)
-        cfg.slBin = STD128;
-        cfg.logQ_ccLWE = 25;
-        cfg.scaleSign = 1.0;
-        cfg.guardGain = 1.0;
 
 
 

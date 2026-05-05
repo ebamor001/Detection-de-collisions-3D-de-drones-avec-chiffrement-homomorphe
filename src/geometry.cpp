@@ -800,10 +800,24 @@ bool GeometryEngine::validatePoints(const IntPoint& p, const IntPoint& q, const 
                pt.z <= DroneConstants::MAX_COORDINATE ;
     };
     
-    if (!isValid(p) || !isValid(q) || !isValid(r)) {
-        std::cerr << "Warning: Points exceed bounds" << std::endl;
+    if (!isValid(p)) {
+        std::cerr << "Error: Point p " << p << " exceeds bounds ["
+                  << DroneConstants::MIN_COORDINATE << ", "
+                  << DroneConstants::MAX_COORDINATE << "]" << std::endl;
+        return false;
     }
-    
+    if (!isValid(q)) {
+        std::cerr << "Error: Point q " << q << " exceeds bounds ["
+                  << DroneConstants::MIN_COORDINATE << ", "
+                  << DroneConstants::MAX_COORDINATE << "]" << std::endl;
+        return false;
+    }
+    if (!isValid(r)) {
+        std::cerr << "Error: Point r " << r << " exceeds bounds ["
+                  << DroneConstants::MIN_COORDINATE << ", "
+                  << DroneConstants::MAX_COORDINATE << "]" << std::endl;
+        return false;
+    }
     return true;
 }
 
