@@ -183,6 +183,8 @@ int main(int argc, char* argv[])
             std::cout << "{\n";
             std::cout << "  \"collision\": " << (totalCollisions > 0 ? "true" : "false") << ",\n";
             std::cout << "  \"collision_count\": " << totalCollisions << ",\n";
+            std::cout << "  \"clear_collision\": " << (clearResults.size() > 0 ? "true" : "false") << ",\n";
+            std::cout << "  \"clear_collision_count\": " << clearResults.size() << ",\n";
             std::cout << "  \"segments_tested\": " << segments_tested << ",\n";
             std::cout << "  \"time_ms\": " << (duration_sec * 1000.0) << ",\n";
             std::cout << "  \"time_clear_ms\": " << clear_ms << ",\n";
