@@ -12,44 +12,50 @@ int main(int argc, char* argv[])
     // =========================
     // 0. PARSE ARGUMENTS CLI
     // =========================
-    std::string path1_file, path2_file;
-    std::string data_dir = "data"; // dossier data/ par défaut
-    int scenario = 0;              // 0 = pas de scénario prédéfini
+    std::string path1_file, path2_file, paths_file;
+    std::string data_dir = "data";
+    int scenario = 0;
     bool json_mode = false;
 
     for (int i = 1; i < argc; i++)
     {
         std::string arg(argv[i]);
-        if      (arg == "--path1"    && i + 1 < argc) path1_file = argv[++i];
-        else if (arg == "--path2"    && i + 1 < argc) path2_file = argv[++i];
-        else if (arg == "--data"     && i + 1 < argc) data_dir   = argv[++i];
-        else if (arg == "--scenario" && i + 1 < argc) scenario   = std::stoi(argv[++i]);
+        if      (arg == "--path1"    && i + 1 < argc) path1_file  = argv[++i];
+        else if (arg == "--path2"    && i + 1 < argc) path2_file  = argv[++i];
+        else if (arg == "--paths"    && i + 1 < argc) paths_file  = argv[++i];
+        else if (arg == "--data"     && i + 1 < argc) data_dir    = argv[++i];
+        else if (arg == "--scenario" && i + 1 < argc) scenario    = std::stoi(argv[++i]);
         else if (arg == "--json")    json_mode = true;
         else if (arg == "--no-bench") { /* ignoré */ }
         else if (arg == "--help")
         {
-            std::cout << "Usage: drone_collision [OPTIONS]\n\n"
+            std::cout << "Usage: drone_batching [OPTIONS]\n\n"
                       << "Options:\n"
-                      << "  --path1 <fichier>    Trajectoire drone 1 (format: (x,y,z)(x,y,z)...)\n"
-                      << "  --path2 <fichier>    Trajectoire drone 2\n"
+                      << "  --path1 <fichier>    Trajectoire drone initiateur\n"
+                      << "  --path2 <fichier>    Trajectoire drone 2 (mode 2 drones)\n"
+                      << "  --paths <fichier>    Fichier multi-trajectoires (1 par ligne)\n"
+                      << "                       -> drone initiateur vs N autres drones\n"
                       << "  --data  <dossier>    Dossier data/ (defaut: ./data)\n"
-                      << "  --scenario <1|2|3>   Scenario predéfini :\n"
+                      << "  --scenario <1|2|3|4> Scenario predéfini :\n"
                       << "      1 = Collision     (route1 x route2, meme altitude z=10)\n"
                       << "      2 = Pas collision  (route1 x route3, altitudes differentes)\n"
                       << "      3 = Zigzag        (route4 x route5, trajectoires complexes)\n"
-                      << "  --json               Sortie JSON (pour server.py)\n"
+                      << "      4 = Initiateur    (route1 vs multiple_routes.txt)\n"
+                      << "  --json               Sortie JSON\n"
                       << "  (sans option)        Chemins aleatoires generes automatiquement\n";
             return 0;
         }
     }
 
-    // Scénarios prédéfinis depuis data/
-    if (scenario == 1) { path1_file = data_dir + "/cryptroute1.txt";
-                         path2_file = data_dir + "/cryptroute2.txt"; }
+    // Scénarios prédéfinis
+    if      (scenario == 1) { path1_file = data_dir + "/cryptroute1.txt";
+                              path2_file = data_dir + "/cryptroute2.txt"; }
     else if (scenario == 2) { path1_file = data_dir + "/cryptroute1.txt";
                               path2_file = data_dir + "/cryptroute3.txt"; }
     else if (scenario == 3) { path1_file = data_dir + "/cryptroute4.txt";
                               path2_file = data_dir + "/cryptroute5.txt"; }
+    else if (scenario == 4) { path1_file = data_dir + "/init_drone.txt";
+                              paths_file = data_dir + "/other_drones.txt"; }
 
     try
     {
@@ -67,10 +73,13 @@ int main(int argc, char* argv[])
         config.logQ_ccLWE   = 25;
 
         if (!json_mode) std::cout << "[*] Initializing CryptoEngine...\n";
+        auto keygen_start = std::chrono::high_resolution_clock::now();
         engine.initialize(config);
 
         if (!json_mode) std::cout << "[*] Setting up Scheme Switching...\n";
         engine.setupSchemeSwitching();
+        auto keygen_end = std::chrono::high_resolution_clock::now();
+        double keygen_real_ms = std::chrono::duration<double,std::milli>(keygen_end - keygen_start).count();
 
         // =========================
         // 2. GEOMETRY + DETECTOR
@@ -79,17 +88,40 @@ int main(int argc, char* argv[])
         IntersectionDetector detector(&engine, &geometry);
 
         // =========================
-        // 3. LIRE LES PATHS (CLI) OU GÉNÉRER (mode test)
+        // 3. LIRE LES PATHS
         // =========================
         Path path1, path2;
+        std::vector<Path> other_paths; // mode multi-drones
+        bool multi_mode = false;
 
-        if (!path1_file.empty() && !path2_file.empty())
+        if (!path1_file.empty() && !paths_file.empty())
+        {
+            // Mode initiateur vs N autres drones
+            multi_mode = true;
+            if (!json_mode)
+            {
+                const char* labels[] = {"","","","","INITIATEUR vs N drones (multiple_routes)"};
+                if (scenario == 4)
+                    std::cout << "[*] Scenario 4 : " << labels[4] << "\n";
+                std::cout << "[*] Initiateur  : " << path1_file << "\n";
+                std::cout << "[*] Autres      : " << paths_file << "\n";
+            }
+            path1       = PathIO::read_single_path(path1_file);
+            other_paths = PathIO::read_multiple_paths(paths_file);
+            if (!json_mode)
+            {
+                PathIO::print_path(path1, "Drone initiateur");
+                for (size_t k = 0; k < other_paths.size(); k++)
+                    PathIO::print_path(other_paths[k], "Drone " + std::to_string(k + 2));
+            }
+        }
+        else if (!path1_file.empty() && !path2_file.empty())
         {
             if (!json_mode)
             {
-                if (scenario > 0)
+                if (scenario > 0 && scenario <= 3)
                 {
-                    const char* labels[] = {"", "COLLISION (meme altitude)", "PAS DE COLLISION (altitudes differentes)", "ZIGZAG complexe"};
+                    const char* labels[] = {"","COLLISION (meme altitude)","PAS DE COLLISION (altitudes diff.)","ZIGZAG complexe"};
                     std::cout << "[*] Scenario " << scenario << " : " << labels[scenario] << "\n";
                 }
                 std::cout << "[*] Lecture : " << path1_file << "\n";
@@ -97,19 +129,28 @@ int main(int argc, char* argv[])
             }
             path1 = PathIO::read_single_path(path1_file);
             path2 = PathIO::read_single_path(path2_file);
+            if (!json_mode)
+            {
+                PathIO::print_path(path1, "Drone 1");
+                PathIO::print_path(path2, "Drone 2");
+            }
         }
         else
         {
             if (!json_mode) std::cout << "[*] Aucun fichier specifie — chemins aleatoires generes\n";
             path1 = PathIO::generate_random_path(5, 42);
             path2 = PathIO::generate_random_path(5, 1337);
+            if (!json_mode)
+            {
+                PathIO::print_path(path1, "Drone 1");
+                PathIO::print_path(path2, "Drone 2");
+            }
         }
 
-        if (!json_mode)
-        {
-            PathIO::print_path(path1, "Drone 1");
-            PathIO::print_path(path2, "Drone 2");
-        }
+        // En mode multi, construire path2 = fusion de toutes les autres trajectoires
+        // pour les tests en clair (paire à paire)
+        if (multi_mode && !other_paths.empty())
+            path2 = other_paths[0]; // pour la référence clair (simplification)
 
         // =========================
         // 4. TEST EN CLAIR (REFERENCE)
@@ -128,18 +169,45 @@ int main(int argc, char* argv[])
         // =========================
         // 5. TEST CHIFFRE (HYBRID CKKS+TFHE)
         // =========================
-        if (!json_mode) std::cout << "\n[*] Testing ENCRYPTED intersections (BATCH 3D)...\n";
+        if (!json_mode)
+        {
+            if (multi_mode)
+                std::cout << "\n[*] Testing ENCRYPTED (initiateur vs "
+                          << other_paths.size() << " drones)...\n";
+            else
+                std::cout << "\n[*] Testing ENCRYPTED intersections (BATCH 3D)...\n";
+        }
 
         auto start2 = std::chrono::high_resolution_clock::now();
 
         int totalCollisions = 0;
         std::vector<std::pair<size_t,size_t>> collisionPairs;
 
+        // Construire la liste de voisins
+        // Mode multi : tous les segments de TOUS les autres drones
+        // Mode 2 drones : segments de path2
         std::vector<Segment> neighbors;
-        for (size_t j = 0; j < path2.size() - 1; j++)
-            neighbors.push_back({path2[j], path2[j + 1]});
+        std::vector<size_t>  neighbor_drone; // index du drone pour chaque segment
 
-        // boucle principale
+        if (multi_mode)
+        {
+            for (size_t d = 0; d < other_paths.size(); d++)
+                for (size_t j = 0; j + 1 < other_paths[d].size(); j++)
+                {
+                    neighbors.push_back({other_paths[d][j], other_paths[d][j + 1]});
+                    neighbor_drone.push_back(d);
+                }
+        }
+        else
+        {
+            for (size_t j = 0; j + 1 < path2.size(); j++)
+            {
+                neighbors.push_back({path2[j], path2[j + 1]});
+                neighbor_drone.push_back(0);
+            }
+        }
+
+        // Boucle principale : chaque segment de l'initiateur vs tous les voisins
         for (size_t i = 0; i < path1.size() - 1; i++)
         {
             Segment mySeg = {path1[i], path1[i + 1]};
@@ -152,7 +220,14 @@ int main(int argc, char* argv[])
                     totalCollisions++;
                     collisionPairs.push_back({i, j});
                     if (!json_mode)
-                        std::cout << "  Collision: seg[" << i << "] x seg[" << j << "]\n";
+                    {
+                        if (multi_mode)
+                            std::cout << "  Collision: seg_init[" << i
+                                      << "] x Drone" << (neighbor_drone[j] + 2)
+                                      << "_seg[" << j << "]\n";
+                        else
+                            std::cout << "  Collision: seg[" << i << "] x seg[" << j << "]\n";
+                    }
                 }
             }
         }
@@ -213,11 +288,13 @@ int main(int argc, char* argv[])
         size_t theo_ss_nobatch = segments_tested * 6; // 6 SS/paire sans batching
         size_t gain_ss         = theo_ss_nobatch / std::max((size_t)1, actual_ss);
 
-        // temps estimé sans batching (820 ms par scheme-switch + 45s keygen)
-        double keygen_ms       = 45000.0;
-        double ss_ms           = 820.0;
-        double time_nobatch_ms = keygen_ms + theo_ss_nobatch * ss_ms;
-        double time_batch_ms   = keygen_ms + actual_ss * ss_ms;
+        // Estimation basée sur les temps réels mesurés sur cette machine
+        // ss_ms_real = temps FHE calcul / nombre de SS réels
+        double ss_ms_real      = (actual_ss > 0)
+                                 ? (duration_sec * 1000.0) / actual_ss
+                                 : 820.0;
+        double time_nobatch_ms = keygen_real_ms + theo_ss_nobatch * ss_ms_real;
+        double time_batch_ms   = keygen_real_ms + actual_ss   * ss_ms_real;
         double gain_time       = time_nobatch_ms / std::max(1.0, time_batch_ms);
 
         // =========================
@@ -287,19 +364,29 @@ int main(int argc, char* argv[])
                       << " SS  (2 copla + 2 produits d'orientations)\n";
             std::cout << "|   GAIN                      : x" << gain_ss << "\n";
             std::cout << "+--------------------------------------------------+\n";
-            std::cout << "| TEMPS ESTIME (820 ms/SS + 45s keygen)            |\n";
-            std::cout << "|   Sans batching             : "
-                      << (time_nobatch_ms / 1000.0) << " s\n";
-            std::cout << "|   Avec batching             : "
-                      << (time_batch_ms / 1000.0) << " s\n";
-            std::cout << "|   GAIN                      : x" << gain_time << "\n";
-            std::cout << "+--------------------------------------------------+\n";
             std::cout << "| TEMPS REEL MESURE                                |\n";
-            std::cout << "|   En clair                  : " << clear_ms << " ms\n";
-            std::cout << "|   FHE batch (mesure)        : "
+            std::cout << "|   [1] KeyGen + SchemeSwitching Setup             |\n";
+            std::cout << "|       (une seule fois, non repete)               |\n";
+            std::cout << "|       Mesure reelle         : "
+                      << (keygen_real_ms / 1000.0) << " s\n";
+            std::cout << "|   [2] Calcul FHE batch (sans keygen)             |\n";
+            std::cout << "|       En clair              : " << clear_ms << " ms\n";
+            std::cout << "|       FHE batch             : "
                       << (duration_sec * 1000.0) << " ms\n";
-            std::cout << "|   Overhead FHE vs clair     : x"
+            std::cout << "|       Overhead FHE/clair    : x"
                       << (duration_sec * 1000.0 / std::max(1L, clear_ms)) << "\n";
+            std::cout << "|   [3] TOTAL (keygen + calcul)                    |\n";
+            std::cout << "|       Total reel FHE        : "
+                      << ((keygen_real_ms + duration_sec * 1000.0) / 1000.0) << " s\n";
+            std::cout << "+--------------------------------------------------+\n";
+            std::cout << "| PROJECTION (meme SS_ms, N segments croissant)   |\n";
+            std::cout << "|   SS/switch mesure          : "
+                      << (actual_ss > 0 ? (duration_sec * 1000.0 / actual_ss) : 0.0) << " ms\n";
+            std::cout << "|   Sans batching (projection): "
+                      << (time_nobatch_ms / 1000.0) << " s\n";
+            std::cout << "|   Avec batching (projection): "
+                      << (time_batch_ms / 1000.0) << " s\n";
+            std::cout << "|   GAIN projete              : x" << gain_time << "\n";
             std::cout << "+--------------------------------------------------+\n";
 
             // ASCII bar chart : SS avec vs sans batching

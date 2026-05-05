@@ -706,15 +706,37 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection3DEncrypted
 
     auto generalInter = engine->eAnd(opp12, opp34);
 
-    auto nearZero = [&](const CiphertextCKKS& v) {
-        return engine->isNearZeroBand(v, 1.0);
+    // SIMD packing : o1,o2,o3,o4 dans 4 slots → 2 SS au lieu de 8 SS
+    uint32_t bSz = engine->getSlotCount();
+    auto makeMask = [&](uint32_t slot) {
+        std::vector<double> m(bSz, 0.0); m[slot] = 1.0;
+        return cc->MakeCKKSPackedPlaintext(m);
     };
+    // Pack : slot k = ok
+    auto o_packed = cc->EvalAdd(
+        cc->EvalAdd(cc->EvalMult(o1, makeMask(0)), cc->EvalMult(o2, makeMask(1))),
+        cc->EvalAdd(cc->EvalMult(o3, makeMask(2)), cc->EvalMult(o4, makeMask(3)))
+    );
+    // isNearZeroBand batch : z_packed[k] = 1 si |ok| <= tau
+    const double tau = 1.0;
+    std::vector<double> tau4(bSz, 0.0);
+    tau4[0] = tau4[1] = tau4[2] = tau4[3] = tau;
+    auto ct_tau4  = cc->MakeCKKSPackedPlaintext(tau4);
+    auto gtPos_p  = engine->compareGtZeroPacked(cc->EvalSub(o_packed, ct_tau4), 4);       // 1 SS
+    auto gtNeg_p  = engine->compareGtZeroPacked(cc->EvalSub(cc->EvalNegate(o_packed), ct_tau4), 4); // 1 SS
+    bootstrapCount += 2;
+    auto one4     = engine->oneLike(gtPos_p);
+    auto z_packed = cc->EvalMult(cc->EvalSub(one4, gtPos_p), cc->EvalSub(one4, gtNeg_p));
 
-    auto z1 = nearZero(o1);
-    auto z2 = nearZero(o2);
-    auto z3 = nearZero(o3);
-    auto z4 = nearZero(o4);
-    bootstrapCount += 8;
+    // Extraire z1..z4 : masquer le slot k puis sumAll pour répliquer sur tous les slots
+    auto expandSlot = [&](const CiphertextCKKS& v, uint32_t slot) {
+        auto masked = cc->EvalMult(v, makeMask(slot));
+        return engine->sumAll(masked);
+    };
+    auto z1 = expandSlot(z_packed, 0);
+    auto z2 = expandSlot(z_packed, 1);
+    auto z3 = expandSlot(z_packed, 2);
+    auto z4 = expandSlot(z_packed, 3);
 
     auto onSegmentEnc = [&](const CiphertextCKKS& pa,
                             const CiphertextCKKS& pb,
