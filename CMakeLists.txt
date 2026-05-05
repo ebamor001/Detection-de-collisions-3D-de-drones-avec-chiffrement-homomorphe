@@ -119,3 +119,38 @@ target_link_libraries(test_main
     ${OpenFHE_LIBRARIES}
     OpenMP::OpenMP_CXX
 )
+
+add_executable(test_io
+    tests/test_io.cpp
+    src/io.cpp
+)
+
+target_link_libraries(test_io
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
+)
+
+add_executable(test_distance_threshold
+    tests/test_distance_threshold.cpp
+    src/engine.cpp
+    src/geometry.cpp
+    src/io.cpp
+)
+
+target_link_libraries(test_distance_threshold
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
+)
+
+add_executable(test_integration
+    tests/test_integration.cpp
+    src/engine.cpp
+    src/geometry.cpp
+    src/intersection.cpp
+    src/io.cpp
+)
+
+target_link_libraries(test_integration
+    ${OpenFHE_LIBRARIES}
+    OpenMP::OpenMP_CXX
+)
