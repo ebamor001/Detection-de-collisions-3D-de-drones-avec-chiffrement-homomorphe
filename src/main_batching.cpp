@@ -162,6 +162,51 @@ int main(int argc, char* argv[])
         size_t segments_tested = (path1.size() - 1) * (path2.size() - 1);
 
         // =========================
+        // 5b. TEST DISTANCE <= SEUIL (CKKS + TFHE)
+        // =========================
+        const double SAFETY_THRESHOLD = 15.0; // unités de coordonnées
+
+        // Convertir Path → Trajectory3D (alignement point à point)
+        size_t N_traj = std::min(path1.size(), path2.size());
+        Trajectory3D traj1, traj2;
+        for (size_t t = 0; t < N_traj; t++) {
+            traj1.push_back({(double)path1[t].x, (double)path1[t].y, (double)path1[t].z});
+            traj2.push_back({(double)path2[t].x, (double)path2[t].y, (double)path2[t].z});
+        }
+
+        if (!json_mode)
+            std::cout << "\n[*] Testing DISTANCE <= " << SAFETY_THRESHOLD
+                      << " (CKKS+TFHE)...\n";
+
+        auto start3 = std::chrono::high_resolution_clock::now();
+
+        // 1. Distances² chiffrées par slot : slot[t] = dx²+dy²+dz²
+        auto ct_dist2  = geometry.computeDistancesBatchTemporal(traj1, traj2);
+        // 2. Masque temporel sur toute la trajectoire
+        auto ct_masked = geometry.applyTemporalMask(ct_dist2, N_traj, N_traj);
+        // 3. Comparaison chiffrée distance² <= seuil² (TFHE via compareLE)
+        auto ct_danger = geometry.detectCollisionInHorizon(ct_masked, SAFETY_THRESHOLD);
+        // 4. Déchiffrement du résultat final
+        auto dangerResults = engine.decryptVector(ct_danger, (uint32_t)N_traj);
+
+        auto end3 = std::chrono::high_resolution_clock::now();
+        double duration3_sec = std::chrono::duration<double>(end3 - start3).count();
+
+        int proximityCollisions = 0;
+        std::vector<size_t> dangerSteps;
+        for (size_t t = 0; t < dangerResults.size(); t++) {
+            if (dangerResults[t] > 0.5) {
+                proximityCollisions++;
+                dangerSteps.push_back(t);
+                if (!json_mode)
+                    std::cout << "  Danger proximite : t=" << t
+                              << " (distance <= " << SAFETY_THRESHOLD << ")\n";
+            }
+        }
+        if (!json_mode && proximityCollisions == 0)
+            std::cout << "  Aucune proximite dangereuse detectee\n";
+
+        // =========================
         // 6. CALCUL DES STATS BATCHING
         // =========================
         size_t actual_ss       = geometry.getBootstrapCount();
@@ -191,6 +236,17 @@ int main(int argc, char* argv[])
             std::cout << "  \"scheme_switches_batch\": " << actual_ss << ",\n";
             std::cout << "  \"scheme_switches_nobatch\": " << theo_ss_nobatch << ",\n";
             std::cout << "  \"batching_gain_ss\": " << gain_ss << ",\n";
+            std::cout << "  \"proximity_collision\": "
+                      << (proximityCollisions > 0 ? "true" : "false") << ",\n";
+            std::cout << "  \"proximity_count\": " << proximityCollisions << ",\n";
+            std::cout << "  \"proximity_threshold\": " << SAFETY_THRESHOLD << ",\n";
+            std::cout << "  \"proximity_time_ms\": " << (duration3_sec * 1000.0) << ",\n";
+            std::cout << "  \"proximity_steps\": [";
+            for (size_t k = 0; k < dangerSteps.size(); k++) {
+                if (k > 0) std::cout << ", ";
+                std::cout << dangerSteps[k];
+            }
+            std::cout << "],\n";
             std::cout << "  \"details\": [";
             for (size_t k = 0; k < collisionPairs.size(); k++)
             {
@@ -205,9 +261,15 @@ int main(int argc, char* argv[])
             std::cout << "\n";
             std::cout << "=== RESULTAT FINAL ===\n";
             if (totalCollisions > 0)
-                std::cout << "  COLLISION DETECTEE (" << totalCollisions << " paire(s))\n";
+                std::cout << "  COLLISION DETECTEE    : " << totalCollisions << " paire(s) (intersection)\n";
             else
-                std::cout << "  AUCUNE COLLISION\n";
+                std::cout << "  AUCUNE COLLISION (intersection)\n";
+            if (proximityCollisions > 0)
+                std::cout << "  DANGER PROXIMITE      : " << proximityCollisions
+                          << " pas de temps (distance <= " << SAFETY_THRESHOLD << ")\n";
+            else
+                std::cout << "  AUCUNE PROXIMITE DANGEREUSE (seuil=" << SAFETY_THRESHOLD << ")\n";
+            std::cout << "  Temps test distance   : " << (duration3_sec * 1000.0) << " ms\n";
 
             // =========================
             // 8. STATS BATCHING DETAILLEES
