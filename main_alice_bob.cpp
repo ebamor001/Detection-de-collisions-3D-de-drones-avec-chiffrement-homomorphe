@@ -405,6 +405,37 @@ static int modeDetectEncrypted(const std::map<std::string,std::string>& args) {
     auto p12_yz = cc->EvalMult(o1_yz, o2_yz);
     auto p34_yz = cc->EvalMult(o3_yz, o4_yz);
 
+    // Valeurs onSegment pour le cas colinéaire (18 ciphertexts)
+    // on1: p2 sur p1→q1?  s=d1·(p2-p1), uu=d1·d1
+    // on2: q2 sur p1→q1?  s=d1·(q2-p1), uu=uu1
+    // on3: p1 sur p2→q2?  s=d2·(p1-p2), uu=d2·d2
+    // on4: q1 sur p2→q2?  s=d2·(q1-p2), uu=uu3
+    auto dot2 = [&](const auto& ax, const auto& ay,
+                    const auto& bx, const auto& by) {
+        return cc->EvalAdd(cc->EvalMult(ax, bx), cc->EvalMult(ay, by));
+    };
+    // XY (drop Z)
+    auto uu1_xy = dot2(d1x,d1y, d1x,d1y);
+    auto uu3_xy = dot2(d2x,d2y, d2x,d2y);
+    auto s1_xy  = dot2(d1x,d1y, cc->EvalSub(p2x,p1x), cc->EvalSub(p2y,p1y));
+    auto s2_xy  = dot2(d1x,d1y, cc->EvalSub(q2x,p1x), cc->EvalSub(q2y,p1y));
+    auto s3_xy  = dot2(d2x,d2y, cc->EvalSub(p1x,p2x), cc->EvalSub(p1y,p2y));
+    auto s4_xy  = dot2(d2x,d2y, cc->EvalSub(q1x,p2x), cc->EvalSub(q1y,p2y));
+    // XZ (drop Y)
+    auto uu1_xz = dot2(d1x,d1z, d1x,d1z);
+    auto uu3_xz = dot2(d2x,d2z, d2x,d2z);
+    auto s1_xz  = dot2(d1x,d1z, cc->EvalSub(p2x,p1x), cc->EvalSub(p2z,p1z));
+    auto s2_xz  = dot2(d1x,d1z, cc->EvalSub(q2x,p1x), cc->EvalSub(q2z,p1z));
+    auto s3_xz  = dot2(d2x,d2z, cc->EvalSub(p1x,p2x), cc->EvalSub(p1z,p2z));
+    auto s4_xz  = dot2(d2x,d2z, cc->EvalSub(q1x,p2x), cc->EvalSub(q1z,p2z));
+    // YZ (drop X)
+    auto uu1_yz = dot2(d1y,d1z, d1y,d1z);
+    auto uu3_yz = dot2(d2y,d2z, d2y,d2z);
+    auto s1_yz  = dot2(d1y,d1z, cc->EvalSub(p2y,p1y), cc->EvalSub(p2z,p1z));
+    auto s2_yz  = dot2(d1y,d1z, cc->EvalSub(q2y,p1y), cc->EvalSub(q2z,p1z));
+    auto s3_yz  = dot2(d2y,d2z, cc->EvalSub(p1y,p2y), cc->EvalSub(p1z,p2z));
+    auto s4_yz  = dot2(d2y,d2z, cc->EvalSub(q1y,p2y), cc->EvalSub(q1z,p2z));
+
     writeFile(out_pref + "_cop.bin",    serializeCiphertext(cop));
 
     writeFile(out_pref + "_nx2.bin",    serializeCiphertext(nx2));
@@ -437,10 +468,30 @@ static int modeDetectEncrypted(const std::map<std::string,std::string>& args) {
     writeFile(out_pref + "_o3_yz.bin", serializeCiphertext(o3_yz));
     writeFile(out_pref + "_o4_yz.bin", serializeCiphertext(o4_yz));
 
+    // onSegment — 18 ciphertexts
+    writeFile(out_pref + "_uu1_xy.bin", serializeCiphertext(uu1_xy));
+    writeFile(out_pref + "_uu3_xy.bin", serializeCiphertext(uu3_xy));
+    writeFile(out_pref + "_s1_xy.bin",  serializeCiphertext(s1_xy));
+    writeFile(out_pref + "_s2_xy.bin",  serializeCiphertext(s2_xy));
+    writeFile(out_pref + "_s3_xy.bin",  serializeCiphertext(s3_xy));
+    writeFile(out_pref + "_s4_xy.bin",  serializeCiphertext(s4_xy));
+    writeFile(out_pref + "_uu1_xz.bin", serializeCiphertext(uu1_xz));
+    writeFile(out_pref + "_uu3_xz.bin", serializeCiphertext(uu3_xz));
+    writeFile(out_pref + "_s1_xz.bin",  serializeCiphertext(s1_xz));
+    writeFile(out_pref + "_s2_xz.bin",  serializeCiphertext(s2_xz));
+    writeFile(out_pref + "_s3_xz.bin",  serializeCiphertext(s3_xz));
+    writeFile(out_pref + "_s4_xz.bin",  serializeCiphertext(s4_xz));
+    writeFile(out_pref + "_uu1_yz.bin", serializeCiphertext(uu1_yz));
+    writeFile(out_pref + "_uu3_yz.bin", serializeCiphertext(uu3_yz));
+    writeFile(out_pref + "_s1_yz.bin",  serializeCiphertext(s1_yz));
+    writeFile(out_pref + "_s2_yz.bin",  serializeCiphertext(s2_yz));
+    writeFile(out_pref + "_s3_yz.bin",  serializeCiphertext(s3_yz));
+    writeFile(out_pref + "_s4_yz.bin",  serializeCiphertext(s4_yz));
+
     auto t1 = std::chrono::high_resolution_clock::now();
     double ms = std::chrono::duration<double,std::milli>(t1 - t0).count();
 
-    std::cout << "[detect_enc] 22 ciphertexts 3D ecrits avec drop axis implicite ("
+    std::cout << "[detect_enc] 40 ciphertexts 3D ecrits (orient + onSegment) ("
               << std::fixed << std::setprecision(0) << ms << " ms)\n";
     std::cout << "CT_RESULT_PREFIX:" << out_pref << "\n";
     std::cout.flush();
@@ -605,20 +656,52 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
     auto o3 = selectByDrop(o3_yz, o3_xz, o3_xy);
     auto o4 = selectByDrop(o4_yz, o4_xz, o4_xy);
 
-    // Cas général
+    // Cas général (2 SS)
     auto opp12 = engine.ltZero(p12);
     auto opp34 = engine.ltZero(p34);
     auto generalInter = engine.eAnd(opp12, opp34);
 
-    // Cas colinéaire / tangent approximatif
+    // Cas colinéaire : near-zero (8 SS)
     auto z1 = engine.isNearZeroBand(o1, 1.0);
     auto z2 = engine.isNearZeroBand(o2, 1.0);
     auto z3 = engine.isNearZeroBand(o3, 1.0);
     auto z4 = engine.isNearZeroBand(o4, 1.0);
 
+    // Valeurs onSegment — chargées depuis Bob, sélectionnées par drop axis
+    auto uu1_xy = loadCt("_uu1_xy"); auto uu3_xy = loadCt("_uu3_xy");
+    auto s1_xy  = loadCt("_s1_xy");  auto s2_xy  = loadCt("_s2_xy");
+    auto s3_xy  = loadCt("_s3_xy");  auto s4_xy  = loadCt("_s4_xy");
+    auto uu1_xz = loadCt("_uu1_xz"); auto uu3_xz = loadCt("_uu3_xz");
+    auto s1_xz  = loadCt("_s1_xz");  auto s2_xz  = loadCt("_s2_xz");
+    auto s3_xz  = loadCt("_s3_xz");  auto s4_xz  = loadCt("_s4_xz");
+    auto uu1_yz = loadCt("_uu1_yz"); auto uu3_yz = loadCt("_uu3_yz");
+    auto s1_yz  = loadCt("_s1_yz");  auto s2_yz  = loadCt("_s2_yz");
+    auto s3_yz  = loadCt("_s3_yz");  auto s4_yz  = loadCt("_s4_yz");
+
+    auto s1  = selectByDrop(s1_yz,  s1_xz,  s1_xy);
+    auto s2  = selectByDrop(s2_yz,  s2_xz,  s2_xy);
+    auto s3  = selectByDrop(s3_yz,  s3_xz,  s3_xy);
+    auto s4  = selectByDrop(s4_yz,  s4_xz,  s4_xy);
+    auto uu1 = selectByDrop(uu1_yz, uu1_xz, uu1_xy);
+    auto uu3 = selectByDrop(uu3_yz, uu3_xz, uu3_xy);
+
+    // onSegment : point sur segment ssi s in [-eps, uu+eps]  (2 SS par check)
+    const double eps = 1.0;
+    auto onSeg = [&](const auto& s, const auto& uu) {
+        auto t1 = cc->EvalAdd(s,  engine.constLike(s, eps));
+        auto t2 = cc->EvalAdd(cc->EvalSub(uu, s), engine.constLike(s, eps));
+        return engine.eAnd(engine.eNot(engine.ltZero(t1)),
+                           engine.eNot(engine.ltZero(t2)));
+    };
+    auto on1 = onSeg(s1, uu1);
+    auto on2 = onSeg(s2, uu1);
+    auto on3 = onSeg(s3, uu3);
+    auto on4 = onSeg(s4, uu3);
+
+    // Combinaison colinéaire correcte : z_i AND on_i (8 SS)
     auto colinearCase = engine.eOr(
-        engine.eOr(z1, z2),
-        engine.eOr(z3, z4)
+        engine.eOr(engine.eAnd(z1, on1), engine.eAnd(z2, on2)),
+        engine.eOr(engine.eAnd(z3, on3), engine.eAnd(z4, on4))
     );
 
     auto inter2D = engine.eOr(generalInter, colinearCase);
@@ -631,10 +714,10 @@ static int modeDecryptWithSS(const std::map<std::string,std::string>& args) {
     double ms = std::chrono::duration<double,std::milli>(t2 - t0).count();
 
     std::cout << "[decrypt_ss] " << (collision ? "COLLISION" : "LIBRE")
-              << " (" << std::fixed << std::setprecision(0) << ms << " ms, 14 SS)\n";
+              << " (" << std::fixed << std::setprecision(0) << ms << " ms, 22 SS)\n";
 
     std::cout << "JSON_RESULT:{\"collision\":" << (collision ? "true" : "false")
-              << ",\"scheme_switches\":14"
+              << ",\"scheme_switches\":22"
               << ",\"total_time_ms\":" << std::fixed << std::setprecision(1) << ms
               << "}\n";
 

@@ -215,35 +215,26 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection2D(
     auto o3 = computeOrientationValue2D(p2, q2, p1, drop);
     auto o4 = computeOrientationValue2D(p2, q2, q1, drop);
 
-    // cas général (2 boots)
+    // Cas général : orientations opposées (2 SS)
     auto opp12 = engine->ltZero(engine->mult(o1, o2));
     auto opp34 = engine->ltZero(engine->mult(o3, o4));
     bootstrapCount += 2;
-    auto generalBit = engine->eAnd(opp12, opp34); //=1 si intersection
+    auto generalBit = engine->eAnd(opp12, opp34);
 
-    // Court-circuit 1 (option bench)-
-    double gVal = engine->decryptValue(generalBit);
-    if (gVal > 0.5) {
-        intersectionTests++;
-        return generalBit; // 2 boots seulement
-    }
+    // Cas colinéaires : near-zero sur chaque orientation (4 SS)
+    auto o1sq = engine->mult(o1, o1);
+    auto o2sq = engine->mult(o2, o2);
+    auto o3sq = engine->mult(o3, o3);
+    auto o4sq = engine->mult(o4, o4);
 
-    //Détection des cas colinéaires / presque colinéaires: near-zero (4 boots)
-    auto o1sq = engine->mult(o1,o1);
-    auto o2sq = engine->mult(o2,o2);
-    auto o3sq = engine->mult(o3,o3);
-    auto o4sq = engine->mult(o4,o4);
+    auto tau1 = engine->constLike(o1sq, tauOri * tauOri);
+    auto tau2 = engine->constLike(o2sq, tauOri * tauOri);
+    auto tau3 = engine->constLike(o3sq, tauOri * tauOri);
+    auto tau4 = engine->constLike(o4sq, tauOri * tauOri);
 
-    auto tau1 = engine->constLike(o1sq, tauOri*tauOri);
-    auto tau2 = engine->constLike(o2sq, tauOri*tauOri);
-    auto tau3 = engine->constLike(o3sq, tauOri*tauOri);
-    auto tau4 = engine->constLike(o4sq, tauOri*tauOri);
-
-    // z1 = 1 si o1² <= tau², sinon 0
-    // compareGreaterThanZero(o1sq - tau1) vaut 1 si o1² > tau²
-    // donc 1 - compare(...) vaut 1 si o1² <= tau²
+    // z_i = 1 si o_i² <= tau²  (orientation quasi-nulle)
     auto z1 = cc->EvalSub(engine->oneLike(o1sq),
-              engine->compareGreaterThanZero(cc->EvalSub(o1sq, tau1))); 
+              engine->compareGreaterThanZero(cc->EvalSub(o1sq, tau1)));
     auto z2 = cc->EvalSub(engine->oneLike(o2sq),
               engine->compareGreaterThanZero(cc->EvalSub(o2sq, tau2)));
     auto z3 = cc->EvalSub(engine->oneLike(o3sq),
@@ -252,17 +243,7 @@ CryptoEngine::CiphertextCKKS GeometryEngine::checkSegmentIntersection2D(
               engine->compareGreaterThanZero(cc->EvalSub(o4sq, tau4)));
     bootstrapCount += 4;
 
-    // Test si au moins une orientation est near-zero
-    auto z_any = engine->eOr(engine->eOr(z1, z2), engine->eOr(z3, z4));
-
-    // Court-circuit 2: si aucune orientation ~0 => parallèles
-    double zanyVal = engine->decryptValue(z_any);
-    if (zanyVal < 0.5) {
-        intersectionTests++;
-        return engine->constLike(z_any, 0.0); // 6 boots total
-    }
-
-    // cas colinéaires : tester si une extremité appartient à l'autre segment projeté
+    // Test d'appartenance au segment pour chaque cas colinéaire (4 SS)
     auto on1 = onSegment2D(p1, p2, q1, drop, epsProj);
     auto on2 = onSegment2D(p1, q2, q1, drop, epsProj);
     auto on3 = onSegment2D(p2, p1, q2, drop, epsProj);
